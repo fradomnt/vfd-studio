@@ -100,6 +100,7 @@ o app encontra a porta pelo número de série.
 | Rolagem vertical | `1F 02` | — | quando a tela enche, o texto sobe |
 | Escrever por cima | `1F 01` | — | padrão |
 | Bitmap tela inteira | `1F 28 66 11` + `00 01` + `10 00` + `01` + 4096 B | — | ver 5.2 |
+| Bitmap de região | `1F 24 x y` (cursor) + `1F 28 66 11` + xL xH + yL yH + `01` + xL×yL B | — | ver 5.3 |
 
 ### 5.2 Formato do bitmap (fixo — não mudar)
 
@@ -115,6 +116,26 @@ Dados (4096 bytes):
 - 256 colunas, **da esquerda para a direita**;
 - 16 bytes por coluna, **de cima para baixo**;
 - **bit 7 = ponto de cima** do grupo de 8; `1` = aceso.
+
+### 5.3 Bitmap de região (envio parcial)
+
+O mesmo comando aceita largura (xL xH, em pontos) e altura (yL yH, em bytes de 8 pontos) menores, e
+desenha a partir do cursor (`1F 24`, x em pontos, y em linhas de 8). Os dados são as colunas da região,
+de cima para baixo, no mesmo formato da tela inteira, só que recortados. Com a região igual à tela toda
+o pacote é byte a byte o da seção 5.2.
+
+No app isso é `vfd.VFD.bits(dados, regiao)`, usado por `mostrar()` quando `config.json` tem
+`"bitmap_parcial": true`: a cada quadro ele compara com a prévia e manda só a caixa que mudou.
+Padrão `false` até validar no vidro:
+
+- (a) região com cursor fora de (0,0) desenha no lugar certo, sem deslocamento;
+- (b) o byte fixo `01` vale com largura/altura menores;
+- (c) região de 1 coluna de largura e de 1 byte de altura funcionam;
+- (d) nenhum ponto fora da região muda.
+
+Como testar: `"bitmap_parcial": true` no `config.json`, abrir o VFD Studio, mandar um texto pelo cartão
+*Texto*, depois mandar o mesmo texto com uma letra a mais. O log mostra os bytes de cada envio
+(`N B enviados em M ms`); o segundo envio deve ser pequeno e o vidro deve ficar igual à prévia da página.
 
 Pontos para os testes automáticos:
 

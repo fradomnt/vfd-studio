@@ -98,7 +98,7 @@ function aplicarStatus(s) {
   if (s.config) mostrarConfig(s.config);
   if (s.versao) $("versao").textContent = s.versao;
   if (s.exibindo) {
-    const nomes = { nada: "nada", "boas-vindas": "boas-vindas", rodizio: "rodízio", api: "frase da API", manual: "envio manual", teste: "teste de pontos" };
+    const nomes = { nada: "nada", "boas-vindas": "boas-vindas", rodizio: "rodízio", api: "frase da API", quadro: "quadro de outro app", manual: "envio manual", teste: "teste de pontos" };
     el.exibindo.textContent = nomes[s.exibindo] || s.exibindo;
   }
   if (s.ultima_api) el.ultimaApi.textContent = `Última da API às ${s.ultima_api.hora}: “${s.ultima_api.texto}”`;

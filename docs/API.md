@@ -1,8 +1,13 @@
-# Manual da API do VFD Studio — para integrar o app de filosofias
+# Manual da API do VFD Studio — para integrar o Devaneios do Aparato (`aparatus`)
 
 Este manual é para quem vai escrever na tela VFD controlada pelo VFD Studio a partir de
-outro programa. A ideia é simples: **o seu app manda o texto; o VFD Studio cuida de tudo o mais**
-(letra, acentos, tamanho, brilho, páginas, desgaste da tela, e o que mostrar quando você não manda nada).
+outro programa. Há dois caminhos:
+
+- **Texto** (`POST /api/v1/texto`): o seu app manda a frase; o VFD Studio cuida de tudo o mais
+  (letra, acentos, tamanho, brilho, páginas, desgaste da tela, e o que mostrar quando você não manda nada).
+- **Quadro** (`POST /api/v1/quadro`, seção 3b): o seu app desenha o bitmap 256×128 e manda pronto; o
+  VFD Studio cuida da serial, da reconexão, do brilho, do guarda-tela e do rodízio de fallback. É o
+  caminho do `aparatus`, que datilografa a fala do agente e mantém o vidro sempre ocupado.
 
 Não é preciso saber nada da tela, da porta serial ou do protocolo Noritake.
 
@@ -34,8 +39,16 @@ E a frase aparece na tela, palavra por palavra. Pronto: isso é 90 % da integra�
 1. Clone o repositório e abra o VFD Studio (`iniciar.command` no Mac, `iniciar.bat` no Windows, ou o
    executável das [Releases](https://github.com/fradomnt/vfd-studio/releases)).
 2. Sem a tela ligada, a página em `http://127.0.0.1:8765` mostra "desconectado" e a API responde
-   `503` (seção 6). **Para desenvolver sem a tela**, use a prévia da página: cole o texto no cartão
-   *Texto* e veja como ficaria em 256×128 pontos. É exatamente o que a API desenha.
+   `503` (seção 6). **Para desenvolver sem a tela**, rode com a tela simulada:
+
+   ```bash
+   VFD_SIMULADO=1 VFD_SEM_NAVEGADOR=1 python app.py      # Mac/Linux (no Windows: set VFD_SIMULADO=1)
+   ```
+
+   O app conecta sozinho na "porta" `simulado`, a API responde `200` e tudo o que você mandar aparece
+   na prévia ponto a ponto da página (`http://127.0.0.1:8765`). Nada sai pela serial. Cada envio dorme o
+   tempo que levaria no fio (3840 B/s), então a cadência das respostas é a do vidro de verdade.
+   `GET /api/v1/estado` devolve `"simulado": true` nesse modo.
 3. Com a tela ligada, o cartão *Outro app escrevendo na tela* tem o botão **Testar agora**, que faz a
    mesma chamada que o seu app fará.
 
@@ -77,11 +90,71 @@ A resposta volta **na hora**; a escrita acontece em seguida, em segundo plano.
 
 ```json
 {"ok": true, "conectado": true, "porta": "/dev/cu.usbserial-A1AEZRMT", "exibindo": "rodizio",
- "cena_padrao": "museu", "cenas": ["museu"], "ultima": {"texto": "…", "hora": "14:32:10", "origem": "filosofias"},
+ "cena_padrao": "museu", "cenas": ["museu"], "ultima": {"texto": "…", "hora": "14:32:10", "origem": "aparatus"},
  "tela": {"largura": 256, "altura": 128}}
 ```
 
-`exibindo`: `boas-vindas`, `rodizio`, `api` (sua frase), `manual`, `teste` ou `nada` (apagada).
+`exibindo`: `boas-vindas`, `rodizio`, `api` (sua frase), `quadro` (seu bitmap), `manual`, `teste` ou
+`nada` (apagada). `simulado` diz se é a tela simulada (seção 2). `bitmap_parcial` diz se o envio por
+região está ligado (seção 3b).
+
+### `POST /api/v1/quadro` — mostrar um bitmap pronto
+
+Para o app que desenha a própria tela (fonte bitmap, datilografia, layout próprio). Corpo JSON:
+
+| Campo | Tipo | O que faz | Se omitir |
+|---|---|---|---|
+| `png` | string | PNG **256×128** em base64 (prefixo `data:image/png;base64,` aceito). Qualquer modo; branco (>127) = ponto aceso. Até 2 MB | obrigatório |
+| `origem` | string | nome do seu app, para o log e o estado | `"api"` |
+| `cena` | string | de onde vêm o brilho e o tempo de volta, se não vierem abaixo | cena padrão |
+| `segundos` | inteiro 3–3600 | sem quadro novo por esse tempo, o rodízio da cena volta | `api_segundos` da cena |
+| `brilho` | inteiro 1–8 | brilho do visor enquanto os seus quadros estão na tela | o da cena |
+
+Comportamento:
+
+1. **O primeiro quadro pausa o rodízio** e cancela uma frase de texto em andamento. O brilho da cena
+   (ou o do campo) é aplicado uma vez; quadros seguintes só mandam o bitmap.
+2. **A resposta volta depois que o quadro saiu pela serial.** Assim o seu app sente a cadência real do
+   vidro sem WebSocket: ~1,1 s para a tela inteira, bem menos com envio parcial (abaixo).
+3. **Fila de tamanho 1, o mais recente vale.** Se chegam quadros mais rápido do que a serial escoa, os
+   que ainda não começaram a sair são descartados. Mande à vontade (uma thread própria, sem travar o seu
+   diálogo); o VFD Studio dita o ritmo. Quadro descartado responde `200` com `"exibido": false`.
+4. **Envio parcial** (`bitmap_parcial` no `config.json`, ligado por quem opera o VFD Studio depois de
+   validar no vidro): o VFD Studio compara o quadro com o anterior e manda só o retângulo que mudou
+   (`1F 28 66 11` com largura e altura menores, a partir do cursor). Um caractere a mais na linha
+   corrente leva ~20 ms; uma linha de 16 pontos inteira, ~0,15 s; rolagem da tela toda, ~1,1 s.
+   Quadro igual ao anterior não manda nada. Desligado, todo quadro sai inteiro (~1,1 s). O seu app
+   não precisa saber qual dos dois está valendo: mande sempre o quadro inteiro e leia `bytes` e `ms`
+   na resposta.
+5. **Passado `segundos` sem quadro novo**, o rodízio da cena volta (verificado a cada 3 s). O guarda-tela
+   (`guarda_tela_segundos`, 120 s por padrão) também vale: quadro parado além disso volta ao rodízio.
+   Para "segurar a última fala até a próxima", basta que a próxima chegue antes desses prazos.
+6. **Uma frase de texto (`/api/v1/texto`) que chegar no meio** entra por cima; o quadro seguinte
+   retoma. Vale sempre o que chegou por último, de qualquer caminho.
+
+Resposta `200`:
+
+| Campo | Significado |
+|---|---|
+| `exibido` | `true` saiu pela serial; `false` descartado por um quadro mais novo (`motivo` explica) |
+| `seq` | número do quadro, crescente desde que o VFD Studio abriu |
+| `bytes` | bytes enviados à tela (4111 = tela inteira; menos = envio parcial; 0 = quadro igual ao anterior) |
+| `ms` | quanto tempo o envio levou |
+| `segundos` | prazo de volta do rodízio a partir deste quadro |
+| `cena` | cena usada para brilho e prazo |
+
+Erros: `400` PNG inválido ou tamanho diferente de 256×128; `503` tela desconectada (seção 6).
+
+```python
+import base64, io, requests
+from PIL import Image
+
+def mostrar_quadro(img: Image.Image, segundos=180):
+    buf = io.BytesIO(); img.convert("1").save(buf, "PNG")
+    corpo = {"png": base64.b64encode(buf.getvalue()).decode(), "origem": "aparatus", "segundos": segundos}
+    r = requests.post("http://127.0.0.1:8765/api/v1/quadro", json=corpo, timeout=10)
+    return r.json()      # {"ok": true, "exibido": true, "seq": 12, "bytes": 4111, "ms": 1080, ...}
+```
 
 ### `POST /api/v1/limpar` — apagar a tela
 
@@ -135,6 +208,9 @@ Se não mandar, vale a cena padrão. A lista está em `GET /api/v1/estado` → `
 Boa prática: trate `503` e conexão recusada como "tela indisponível agora", sem travar o seu app, e
 registre no seu log. Ao ligar o Mac, o VFD Studio leva uns 5 s para conectar na tela.
 
+Para `POST /api/v1/quadro`, use `timeout` de 10 s no cliente: a resposta espera o quadro sair pela
+serial, e o VFD Studio desiste sozinho depois de 10 s (`MSG_TIMEOUT`, código `400`).
+
 ---
 
 ## 7. Exemplos completos
@@ -147,7 +223,7 @@ import requests
 VFD = "http://127.0.0.1:8765"
 
 def mostrar(frase, cena=None, segundos=None):
-    corpo = {"texto": frase, "origem": "filosofias"}
+    corpo = {"texto": frase, "origem": "aparatus"}
     if cena: corpo["cena"] = cena
     if segundos: corpo["segundos"] = segundos
     try:
@@ -169,7 +245,7 @@ mostrar("A dúvida é o começo da sabedoria.", segundos=40)
 const VFD = "http://127.0.0.1:8765";
 
 async function mostrar(frase, { cena, segundos } = {}) {
-  const corpo = { texto: frase, origem: "filosofias", ...(cena && { cena }), ...(segundos && { segundos }) };
+  const corpo = { texto: frase, origem: "aparatus", ...(cena && { cena }), ...(segundos && { segundos }) };
   try {
     const r = await fetch(`${VFD}/api/v1/texto`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo),
@@ -216,6 +292,11 @@ Serve para saber que a frase terminou de aparecer (`exibindo` passa a `"api"` co
 ## 9. Regras de convivência no Mac mini
 
 - O VFD Studio usa a **porta 8765**. Não use essa porta no seu app.
+- Rodando como `git subtree` dentro de outro repositório (ex.: `aparatus/vfd-studio/`), nada muda: o app
+  acha `static/`, `assets/`, `cenas.json` e `config.json` ao lado do próprio código, e o `.venv` nasce
+  dentro dessa pasta (ponha `vfd-studio/.venv/` e `vfd-studio/logs/` no `.gitignore` de fora).
+  `cenas.json` e `config.json` são versionados aqui: ajustes feitos na máquina da instalação precisam
+  ser commitados, ou o próximo `git subtree pull` conflita.
 - Ele roda em segundo plano, sem janela; o seu app pode ficar em tela cheia por cima.
 - Não é preciso iniciar nem fechar o VFD Studio: ele abre com o Mac e apaga a tela ao encerrar.
 - Se quiser ver o que está acontecendo, abra `http://127.0.0.1:8765` num navegador: página, prévia da
@@ -266,12 +347,13 @@ Serve para saber que a frase terminou de aparecer (`exibindo` passa a `"api"` co
 
 ## 11. Checklist de integração
 
-- [ ] Chamada `POST /api/v1/texto` com `texto` e `origem`.
+- [ ] Chamada `POST /api/v1/texto` com `texto` e `origem`, ou `POST /api/v1/quadro` com `png` e `origem`.
+- [ ] Quadros numa thread própria, com `timeout` de 10 s, aceitando `"exibido": false` sem reclamar.
 - [ ] `503` e conexão recusada tratados como "tente depois", sem travar.
 - [ ] Intervalo entre frases de pelo menos 1 minuto, ou `segundos` compatível com o tamanho.
 - [ ] Frases de até ~40 palavras (ou aceitar que vire páginas).
 - [ ] Nenhuma dependência da porta 8765 além desta API.
-- [ ] Testado com o botão **Testar agora** da página e depois com o seu app.
+- [ ] Testado com `VFD_SIMULADO=1` (prévia da página), depois com o botão **Testar agora** e por fim no vidro.
 
 Dúvidas e pedidos (fila em vez de cancelamento, outro comportamento ao terminar, mais eventos no
 WebSocket): abra uma issue no repositório.

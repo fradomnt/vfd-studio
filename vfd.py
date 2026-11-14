@@ -40,9 +40,19 @@ import serial
 from serial.tools import list_ports
 
 SERIAL_CONVERSOR = "A1AEZRMT"      # nº de série do FT232R do PCM-KW-469
+PORTA_SIMULADA = "simulado"        # nome da "porta" da tela simulada (VFD_SIMULADO=1)
+BYTES_POR_S = 3840                 # 38400 bps, 8N1: 10 bits por byte
+
+
+def simulado():
+    """VFD_SIMULADO=1 liga a tela simulada: sem serial, só a prévia. Para desenvolver sem o hardware."""
+    return os.environ.get("VFD_SIMULADO", "") not in ("", "0")
+
 
 def achar_porta():
     """Devolve a porta do conversor: VFD_PORTA, ou busca pelo nº de série / chip FTDI."""
+    if simulado():
+        return PORTA_SIMULADA
     if os.environ.get("VFD_PORTA"):
         return os.environ["VFD_PORTA"]
     portas = list(list_ports.comports())
@@ -64,6 +74,9 @@ def portas():
     """Lista de portas como dicionários (usada pela aplicação web).
     'conversor' = True para o PCM-KW-469 (nº de série) ou qualquer FTDI."""
     lista = []
+    if simulado():
+        lista.append({"porta": PORTA_SIMULADA, "descricao": "Tela simulada (VFD_SIMULADO=1)", "serial": "",
+                      "ftdi": False, "conversor": True})
     for p in list_ports.comports():
         nosso = bool(p.serial_number and SERIAL_CONVERSOR in p.serial_number)
         lista.append({"porta": p.device, "descricao": p.description or "",
@@ -172,7 +185,9 @@ class VFD:
     @staticmethod
     def _codificar(img):
         """PIL Image (qualquer modo) -> 4096 bytes no formato da tela.
-        Colunas da esquerda p/ direita; 16 bytes por coluna de cima p/ baixo; bit7 = ponto de cima."""
+        Colunas da esquerda p/ direita; 16 bytes por coluna de cima p/ baixo; bit7 = ponto de cima.
+        Transpor a imagem faz cada coluna virar uma linha, e tobytes() do modo "1" empacota 8 pontos
+        por byte com o primeiro ponto no bit 7: é exatamente o formato da tela, sem laço em Python."""
         from PIL import Image, ImageOps
         g = img.convert("L")
         if g.size != (W, H):                         # ajusta mantendo proporção, centraliza
@@ -181,23 +196,47 @@ class VFD:
             fundo.paste(g, ((W - g.width) // 2, (H - g.height) // 2))
             g = fundo
         bw = g.point(lambda v: 255 if v > 127 else 0, "1")
-        px = bw.load()
-        out = bytearray()
-        for x in range(W):
-            for yb in range(H // 8):
-                b = 0
-                for i in range(8):
-                    if px[x, yb * 8 + i]: b |= 0x80 >> i
-                out.append(b)
-        return bytes(out)
+        return bw.transpose(Image.Transpose.TRANSPOSE).tobytes()
+
+    @staticmethod
+    def pacote_bitmap(dados, x=0, yb=0, largura=W, altura_bytes=H // 8):
+        """Comando 1F 28 66 11 para uma região: cursor em (x pontos, yb linha de 8 pontos), largura em
+        pontos, altura em bytes. 'dados' = colunas da região, altura_bytes bytes por coluna.
+        Com a tela inteira (padrão) sai o pacote validado na bancada: 00 01 10 00 01 + 4096 B."""
+        assert len(dados) == largura * altura_bytes, "dados não batem com a região"
+        return cmd_cursor(x, yb) + b"\x1f\x28\x66\x11" + bytes([largura & 0xFF, largura >> 8,
+                                                                  altura_bytes & 0xFF, altura_bytes >> 8, 1]) + dados
+
+    @staticmethod
+    def regiao_diferente(antes, depois):
+        """Caixa (x0, x1, yb0, yb1) que cobre todos os bytes que mudaram entre dois quadros de 4096 B,
+        em colunas e linhas de 8 pontos. None se nada mudou."""
+        n = H // 8
+        xs = [x for x in range(W) if antes[x * n:(x + 1) * n] != depois[x * n:(x + 1) * n]]
+        if not xs:
+            return None
+        x0, x1 = xs[0], xs[-1]
+        ybs = [yb for yb in range(n) if any(antes[x * n + yb] != depois[x * n + yb] for x in xs)]
+        return x0, x1, ybs[0], ybs[-1]
+
+    def bits(self, dados, regiao=None):
+        """Mostra 4096 bytes já no formato da tela. Com 'regiao' = (x0, x1, yb0, yb1), manda só essa
+        caixa (1F 28 66 11 aceita largura e altura menores a partir do cursor). Devolve os bytes enviados."""
+        n = H // 8
+        if regiao is None or regiao == (0, W - 1, 0, n - 1):
+            pacote = self.pacote_bitmap(dados)
+        else:
+            x0, x1, yb0, yb1 = regiao
+            fatia = b"".join(dados[x * n + yb0:x * n + yb1 + 1] for x in range(x0, x1 + 1))
+            pacote = self.pacote_bitmap(fatia, x0, yb0, x1 - x0 + 1, yb1 - yb0 + 1)
+        self.raw(pacote)
+        return len(pacote)
 
     def bitmap(self, img, inverter=False):
         """Mostra uma PIL Image na tela inteira."""
         from PIL import ImageOps
         if inverter: img = ImageOps.invert(img.convert("L"))
-        dados = self._codificar(img)
-        pacote = cmd_cursor(0, 0) + b"\x1f\x28\x66\x11" + bytes([W & 0xFF, W >> 8, H // 8, 0, 1]) + dados
-        self.raw(pacote)
+        self.bits(self._codificar(img))
 
     def imagem(self, caminho, inverter=False):
         """Mostra um arquivo PNG/JPG/BMP. Branco = ponto aceso. Use inverter=True p/ fundo branco."""
@@ -215,6 +254,34 @@ class VFD:
         d = ImageDraw.Draw(im); d.fontmode = "1"
         return im, d
 
+class VFDFalso(VFD):
+    """Tela simulada: mesmos métodos, nenhuma serial. Cada envio dorme o tempo que levaria no fio
+    (3840 B/s), para quem desenvolve sem o hardware sentir a cadência real. Liga com VFD_SIMULADO=1."""
+
+    def __init__(self, porta=None, baud=38400, iniciar=True, ao_enviar=None):
+        self.ao_enviar = ao_enviar
+        self.porta = PORTA_SIMULADA
+        self.ser = None
+        print("Tela simulada (VFD_SIMULADO=1): nada sai pela serial.")
+        if iniciar:
+            self.iniciar()
+
+    def fechar(self):
+        pass
+
+    def raw(self, dados, pausa=0.0):
+        t0 = time.time()
+        time.sleep(len(dados) / BYTES_POR_S + pausa)
+        if self.ao_enviar:
+            self.ao_enviar(len(dados), time.time() - t0)
+
+
+def abrir(porta=None, **kw):
+    """VFD na porta dada, ou VFDFalso quando a porta é a simulada."""
+    cls = VFDFalso if (porta or achar_porta()) == PORTA_SIMULADA else VFD
+    return cls(porta, **kw)
+
+
 # ----------------------------------------------------------------- CLI
 def _fonte_ttf(tam):
     from PIL import ImageFont
@@ -230,7 +297,7 @@ def main(argv):
     acao, args = argv[1], argv[2:]
     if acao == "portas":
         listar_portas(); return
-    with VFD() as t:
+    with abrir() as t:
         if acao == "texto":
             if args and args[0] == "-l": t.linhas(*args[1:])
             else: t.texto(" ".join(args))

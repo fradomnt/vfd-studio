@@ -9,14 +9,17 @@ Regras de arquitetura:
 - Este processo é o ÚNICO dono da porta serial: um objeto VFD por vez, protegido por um lock.
 - Todo envio à serial roda num executor de 1 thread, com timeout, para o servidor nunca travar.
 - Autonomia (museu): procura o conversor sozinho, mostra boas-vindas, liga o rodízio da cena padrão,
-  reconecta se o USB sair. Frases que chegam pela API v1 interrompem o rodízio e, passado o tempo da
-  cena, o rodízio volta sozinho. A tela nunca fica vazia por falta de quem mande.
+  reconecta se o USB sair. Frases (texto) e quadros (bitmap pronto) que chegam pela API v1 interrompem
+  o rodízio e, passado o tempo da cena, o rodízio volta sozinho. A tela nunca fica vazia por falta de
+  quem mande.
+- VFD_SIMULADO=1 roda sem hardware: a "porta" simulado só alimenta a prévia da página, no ritmo da serial.
 """
 import asyncio
 import base64
 import collections
 import concurrent.futures
 import contextlib
+import io
 import os
 import threading
 import time
@@ -63,9 +66,12 @@ class Estado:
         # Prévia: os mesmos 4096 bytes do formato da tela (colunas, bit7 = ponto de cima).
         self.previa = bytes(driver.W * driver.H // 8)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="serial")
-        self.exibindo = "nada"              # nada | boas-vindas | rodizio | api | manual | teste
+        self.exibindo = "nada"              # nada | boas-vindas | rodizio | api | quadro | manual | teste
         self.parado_desde = None            # quando a imagem atual (não rodízio) entrou na tela
-        self.ultima_api = None              # resumo da última frase recebida pela API
+        self.ultima_api = None              # resumo da última frase ou quadro recebido pela API
+        # True quando a prévia reproduz o vidro byte a byte (desde o último 1B 40 + 0C). Só então o
+        # envio parcial (config bitmap_parcial) pode mandar apenas a região que mudou.
+        self.previa_na_tela = False
 
     @property
     def conectado(self):
@@ -150,13 +156,28 @@ def ao_enviar(n, segundos):
 
 
 def mostrar(img, origem):
-    """Manda uma imagem para a tela (na thread de quem chama, com lock) e atualiza a prévia."""
-    com_tela(lambda t: t.bitmap(img))
-    estado.previa = driver.VFD._codificar(img)
+    """Manda uma imagem para a tela (na thread de quem chama, com lock) e atualiza a prévia.
+    Devolve os bytes enviados. Com bitmap_parcial ligado e a prévia fiel ao vidro, manda só a caixa
+    que mudou em relação ao quadro anterior (nada, se o quadro é igual)."""
+    novo = driver.VFD._codificar(img)
+
+    def enviar(tela):
+        regiao = None
+        if cenas.config()["bitmap_parcial"] and estado.previa_na_tela:
+            regiao = driver.VFD.regiao_diferente(estado.previa, novo)
+            if regiao is None:
+                return 0
+        n = tela.bits(novo, regiao)
+        estado.previa = novo
+        return n
+
+    enviados = com_tela(enviar)
+    estado.previa = novo
     estado.exibindo = origem
     # tela apagada não gasta; rodízio se cuida sozinho; o resto tem prazo (guarda-tela)
     estado.parado_desde = None if origem in ("rodizio", "nada") or not any(estado.previa) else time.time()
     publicar_previa()
+    return enviados
 
 
 # ============================================================ serial (thread)
@@ -190,6 +211,7 @@ def _fechar_tela(motivo=None, apagar=False):
         estado.tela.fechar()
     estado.tela = None
     estado.exibindo = "nada"
+    estado.previa_na_tela = False
     if motivo:
         registrar("erro", motivo)
     publicar_status()
@@ -203,7 +225,7 @@ def _abrir_porta(porta):
         estado.tela.fechar()
         estado.tela = None
     try:
-        estado.tela = driver.VFD(porta, iniciar=False, ao_enviar=ao_enviar)
+        estado.tela = driver.abrir(porta, iniciar=False, ao_enviar=ao_enviar)
     except (serial.SerialException, OSError, ValueError) as e:
         raise RuntimeError(mensagem_erro(e)) from e
     estado.porta = porta
@@ -374,6 +396,19 @@ class Escrita:
 escrita = Escrita()
 
 
+class Quadro:
+    """Quadros prontos (bitmaps) vindos de outro app. Fila de tamanho 1: só o mais recente é enviado."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.seq = 0                        # número do último quadro recebido
+        self.ultimo = 0.0                   # quando o último quadro saiu pela serial
+        self.volta_em = None                # quando o rodízio volta, se não chegar quadro novo
+
+
+quadro = Quadro()
+
+
 def _escrever(texto, cena, nome_cena, modo, segundos, peso, tamanho, origem):
     """Thread: mostra o texto (inteiro ou palavra a palavra, em páginas) e agenda a volta do rodízio."""
     with escrita.lock:
@@ -479,6 +514,7 @@ def iniciar_e_apagar_duas_vezes(tela):
     time.sleep(0.15)
     tela.limpar()
     estado.previa = bytes(len(estado.previa))
+    estado.previa_na_tela = True
     estado.exibindo = "nada"
     estado.parado_desde = None
     publicar_previa()
@@ -528,8 +564,10 @@ def conectar_sozinho():
         cfg = cenas.config()
         registrar("info", f"Tela inicializada; brilho {cena['brilho']} de 8 (cena \"{nome}\").")
         if cfg["auto_exposicao"]:
+            # se nesse meio-tempo a API já ocupou a tela, o rodízio não entra por cima
             t = threading.Timer(cfg["boas_vindas_segundos"] if cfg["boas_vindas"] else 0.5,
-                                voltar_ao_rodizio, args=("início automático",))
+                                lambda: estado.exibindo in ("boas-vindas", "nada")
+                                and voltar_ao_rodizio("início automático"))
             t.daemon = True
             t.start()
     except Exception as e:
@@ -557,8 +595,17 @@ def guarda_tela(cfg):
         registrar("info", f"Tela apagada ({motivo}).")
 
 
+def fim_dos_quadros():
+    """Passou 'segundos' do último quadro da API sem chegar outro: o rodízio da cena volta."""
+    if estado.exibindo != "quadro" or not quadro.volta_em or time.time() < quadro.volta_em:
+        return
+    quadro.volta_em = None
+    voltar_ao_rodizio("fim dos quadros da API")
+
+
 def laco_autonomia():
-    """A cada 3 s: se configurado e desconectado, tenta conectar. Se conectado, vigia se a porta sumiu."""
+    """A cada 3 s: se configurado e desconectado, tenta conectar. Se conectado, vigia se a porta sumiu,
+    o prazo dos quadros da API e o guarda-tela."""
     time.sleep(1.5)
     while True:
         try:
@@ -574,6 +621,7 @@ def laco_autonomia():
                                             else "Plugue o USB e clique em Conectar."))
             elif cfg["auto_conectar"]:
                 conectar_sozinho()
+            fim_dos_quadros()
             guarda_tela(cfg)
         except Exception as e:
             registrar("erro", f"Vigia: {e}")
@@ -879,12 +927,91 @@ def api_v1_texto(pedido: PedidoTextoV1):
         return resposta_erro(e, 503 if str(e) == MSG_SEM_CONEXAO else 400)
 
 
+class PedidoQuadroV1(BaseModel):
+    """Um quadro pronto: PNG 256x128 em base64 (branco = ponto aceso). O app que manda desenha tudo."""
+    png: str
+    origem: str = "api"            # nome do app que mandou (log e estado)
+    cena: str | None = None        # de onde vêm brilho e tempo de volta, se não vierem aqui
+    segundos: int | None = None    # sem quadro novo por esse tempo, o rodízio volta
+    brilho: int | None = None      # 1..8; sem ele vale o da cena
+
+
+def decodificar_png(texto):
+    """base64 (com ou sem prefixo data:) -> PIL Image 256x128. Levanta ValueError claro."""
+    if "," in texto[:40] and texto.startswith("data:"):
+        texto = texto.split(",", 1)[1]
+    try:
+        dados = base64.b64decode(texto, validate=True)
+    except Exception:
+        raise ValueError("Campo png não é base64 válido.")
+    if len(dados) > 2_000_000:
+        raise ValueError("PNG grande demais (máximo de 2 MB).")
+    try:
+        img = Image.open(io.BytesIO(dados))
+        img.load()
+    except Exception:
+        raise ValueError("Campo png não é uma imagem que eu consiga abrir.")
+    if img.size != (driver.W, driver.H):
+        raise ValueError(f"A imagem tem {img.width}x{img.height}; a tela é {driver.W}x{driver.H}.")
+    return img
+
+
+@app.post("/api/v1/quadro")
+async def api_v1_quadro(pedido: PedidoQuadroV1):
+    """Mostra um bitmap pronto. Responde depois que o quadro saiu pela serial (ou foi descartado por
+    um mais novo), para o app que manda sentir a cadência real do vidro."""
+    try:
+        if not estado.conectado:
+            raise RuntimeError(MSG_SEM_CONEXAO)
+        img = decodificar_png(pedido.png)
+        nome, cena = cenas.obter(pedido.cena or cenas.config()["cena_padrao"])
+        segundos = max(3, min(3600, int(pedido.segundos))) if pedido.segundos else cena["api_segundos"]
+        brilho = max(1, min(8, int(pedido.brilho))) if pedido.brilho else cena["brilho"]
+    except Exception as e:
+        return resposta_erro(e, 503 if str(e) == MSG_SEM_CONEXAO else 400)
+    origem = pedido.origem[:30]
+    with quadro.lock:
+        quadro.seq += 1
+        meu = quadro.seq
+
+    def enviar():
+        if meu != quadro.seq:
+            return None                     # chegou um mais novo enquanto este esperava: descartado
+        if estado.exibindo != "quadro" or expo.ativa:
+            parar_exposicao()
+            escrita.cancelar.set()
+            if escrita.volta:
+                escrita.volta.cancel()
+            registrar("info", f"API ({origem}): quadros prontos começaram a chegar; rodízio pausado.")
+        if estado.brilho != brilho:
+            aplicar_brilho(brilho)
+        t0 = time.time()
+        n = mostrar(img, "quadro")
+        return n, time.time() - t0
+
+    try:
+        resultado = await na_serial(enviar)
+    except Exception as e:
+        return resposta_erro(e, 503 if str(e) == MSG_SEM_CONEXAO else 400)
+    if resultado is None:
+        return {"ok": True, "exibido": False, "seq": meu, "motivo": "descartado: chegou um quadro mais novo"}
+    n, dt = resultado
+    quadro.ultimo = time.time()
+    quadro.volta_em = quadro.ultimo + segundos
+    estado.ultima_api = {"texto": f"quadro #{meu}", "cena": nome, "hora": time.strftime("%H:%M:%S"),
+                         "origem": origem}
+    publicar_status()
+    return {"ok": True, "exibido": True, "seq": meu, "bytes": n, "ms": int(dt * 1000), "segundos": segundos,
+            "cena": nome}
+
+
 @app.get("/api/v1/estado")
 def api_v1_estado():
     nome, cena = cena_atual()
     return {"ok": True, "conectado": estado.conectado, "porta": estado.porta, "exibindo": estado.exibindo,
             "cena_padrao": nome, "cenas": sorted(cenas.todas()), "ultima": estado.ultima_api,
-            "tela": {"largura": driver.W, "altura": driver.H}}
+            "tela": {"largura": driver.W, "altura": driver.H}, "simulado": estado.porta == driver.PORTA_SIMULADA,
+            "bitmap_parcial": cenas.config()["bitmap_parcial"]}
 
 
 @app.post("/api/v1/limpar")

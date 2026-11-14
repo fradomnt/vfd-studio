@@ -45,6 +45,10 @@ CONFIG_PADRAO = {
     "guarda_tela": True,
     "guarda_tela_segundos": 120,
     "teste_segundos": 30,          # "Acender todos" e xadrez: prazo menor, é carga máxima
+    # Envio parcial: manda só a região que mudou entre um quadro e o seguinte (1F 28 66 11 com largura
+    # e altura menores). Um caractere a mais na linha leva ~20 ms em vez de ~1,1 s da tela inteira.
+    # Ligue depois de validar no vidro; com False todo quadro sai inteiro, como sempre.
+    "bitmap_parcial": False,
 }
 
 
