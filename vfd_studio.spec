@@ -51,5 +51,7 @@ if sys.platform == "darwin":
             "CFBundleName": NOME,
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",
+            # agente: sem ícone no Dock e sem roubar o foco do app em tela cheia (o do Marlus)
+            "LSUIElement": True,
         },
     )
