@@ -6,8 +6,6 @@ Aplicação local para controlar a tela VFD gráfica **Noritake Itron GU256X128C
 por um conversor USB-RS232. Roda em **Windows e macOS** com o mesmo código: um servidor Python sobe só
 no seu computador e abre a página em `http://127.0.0.1:8765`.
 
-Pensada para instalações que ficam ligadas sem ninguém por perto: a tela pode ser lida atrás de uma lente.
-
 ## O que faz
 
 - Acha o conversor sozinho (FTDI, nº de série `A1AEZRMT`), conecta e inicializa a tela.
