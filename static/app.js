@@ -421,7 +421,7 @@ el.texto.addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey) && conectado) { ev.preventDefault(); enviarTexto(); }
 });
 for (const b of el.testes) b.addEventListener("click", () => acao(b, () => enviarTeste(b)));
-el.brilho.addEventListener("input", () => { el.brilhoValor.textContent = `${el.brilho.value} de 8`; });
+el.brilho.addEventListener("input", () => { el.brilhoValor.textContent = `${el.brilho.value} de 8`; el.cenaInfo.textContent = `brilho ${el.brilho.value} ainda não salvo na cena — clique em Salvar cena`; });
 el.brilho.addEventListener("change", () => acao(el.brilho, () => api("/api/brilho", { nivel: Number(el.brilho.value) })));
 el.expoAdd.addEventListener("click", () => acao(el.expoAdd, async () => adicionarAoRodizio()));
 el.expoIniciar.addEventListener("click", () => acao(el.expoIniciar, iniciarExpo));

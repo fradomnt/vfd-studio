@@ -89,12 +89,6 @@
     <!-- Exposição: brilho + rodízio com deslocamento -->
     <section class="cartao largo" id="expo-cartao">
       <h2>Exposição <small id="expo-info">parada</small></h2>
-      <div class="linha tamanho">
-        <label for="brilho">Brilho</label>
-        <input type="range" id="brilho" min="1" max="8" value="8" disabled>
-        <output id="brilho-valor">8 de 8</output>
-      </div>
-      <p class="dica">Brilho menor gasta menos a tela. Use o mais baixo que ainda dê para ler com a lente.</p>
       <ol id="expo-lista" class="expo-lista"></ol>
       <p id="expo-vazia" class="dica">Rodízio vazio. Escreva um texto acima e clique em "Adicionar o texto atual".</p>
       <div class="linha">
@@ -113,8 +107,14 @@
       <h2>Cena e autonomia <small id="cena-info">o que a tela faz sozinha no museu</small></h2>
       <div class="duas">
         <div>
+          <h3>Brilho do visor</h3>
+          <div class="linha tamanho brilho-cena">
+            <input type="range" id="brilho" min="1" max="8" value="8" disabled aria-label="Brilho do visor">
+            <output id="brilho-valor">8 de 8</output>
+          </div>
+          <p class="dica">Vale na hora e fica salvo na cena. É o ajuste que mais protege a tela: use o menor nível que ainda dê para ler com a lente. Cada cena aplica o seu brilho ao entrar (rodízio, frase da API, boas-vindas).</p>
           <h3>Cena</h3>
-          <p class="dica">Uma cena guarda letra, tamanho, espelhar, brilho, rodízio e como as frases da API aparecem. Fica em <code>cenas.json</code>.</p>
+          <p class="dica">Uma cena guarda brilho, letra, tamanho, espelhar, rodízio e como as frases da API aparecem. Fica em <code>cenas.json</code>.</p>
           <div class="linha">
             <select id="cena-sel" aria-label="Cenas salvas"></select>
             <button id="cena-aplicar" class="secundario" title="Vira a cena padrão: aplica o brilho e liga o rodízio dela">Aplicar</button>

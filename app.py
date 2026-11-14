@@ -337,6 +337,11 @@ def voltar_ao_rodizio(motivo):
         return
     nome, cena = cena_atual()
     pedido, imagens = exposicao_da_cena(nome, cena)
+    try:
+        if estado.brilho != cena["brilho"]:
+            aplicar_brilho(cena["brilho"])
+    except Exception as e:
+        registrar("erro", f"Não consegui aplicar o brilho da cena: {e}")
     if pedido is None:
         registrar("info", f"Cena \"{nome}\" não tem rodízio; a tela fica com o último conteúdo.")
         return
@@ -364,6 +369,8 @@ def _escrever(texto, cena, nome_cena, modo, segundos, peso, tamanho, origem):
             return
         try:
             parar_exposicao()
+            if estado.brilho != cena["brilho"]:
+                aplicar_brilho(cena["brilho"])
             paginas = presets.paginar(texto, peso, tamanho)
             por_quadro = cena["api_palavras_por_quadro"]
             for n_pag, pagina in enumerate(paginas, 1):

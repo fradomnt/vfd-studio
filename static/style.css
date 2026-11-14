@@ -172,3 +172,5 @@ input[type=text]:focus, input[type=number]:focus { outline: 3px solid var(--acen
 #cena-cartao textarea { font-size: 14px; }
 code { font: 12px var(--f-mono); background: var(--c-log); padding: 1px 5px; border-radius: 4px; }
 #exibindo { color: var(--acento-escuro); }
+.brilho-cena input[type=range] { height: 28px; accent-color: var(--acento-escuro); }
+.brilho-cena output { font: 800 16px var(--f-mono); color: var(--tinta); min-width: 70px; }
