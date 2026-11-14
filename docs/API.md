@@ -224,7 +224,47 @@ Serve para saber que a frase terminou de aparecer (`exibindo` passa a `"api"` co
 
 ---
 
-## 10. Checklist de integração
+## 10. Recomendações e cuidados para o seu app
+
+**Conteúdo das frases**
+1. **Texto puro.** Sem markdown, asteriscos, listas, emojis ou símbolos: a fonte da tela não tem emoji
+   nem alfabetos fora do latino, e eles viram quadradinhos. Acentos e cedilha funcionam.
+2. **Curto.** Até ~40 palavras; o ideal da escultura é uma frase de 1 a 3 linhas.
+3. **Peça isso à IA no prompt:** "responda em texto puro, em português, no máximo 30 palavras, sem
+   markdown, sem emojis". É mais barato do que limpar depois.
+4. **Varie as frases.** Texto fixo por horas marca a tela (foi assim que ela ficou com fantasmas).
+   Variar é proteção física, não só estética.
+
+**Ritmo**
+5. Uma frase a cada 1 a 3 minutos. Rajada só cancela a anterior antes de alguém ler.
+6. Para a frase ficar até a próxima, mande `segundos` alto (ex.: 180); senão o rodízio volta antes.
+
+**Robustez**
+7. **Nunca trave por causa da tela.** `503` ou conexão recusada = tentar de novo em 30 s, em segundo
+   plano. O seu app não pode depender de o VFD Studio responder.
+8. **Nunca trave por causa da IA.** Se a API de IA cair ou faltar internet, a tela volta ao rodízio
+   sozinha; o seu app só não pode ficar numa tela de erro em cima do visitante.
+9. **Abra sozinho ao ligar o Mac e volte sozinho se fechar** (item de login + relançar). Queda de luz no
+   museu é certeza, não hipótese.
+10. **Tela cheia de verdade:** sem cursor, sem barra, sem protetor de tela, sem diálogo de atualização.
+11. **Log em arquivo** do que mandou e do que a API respondeu. É o primeiro lugar onde se olha quando
+    algo estranha.
+
+**Custo e segurança**
+12. A API de IA é paga: limite de chamadas por hora e teto diário. Um loop travado gasta a conta numa noite.
+13. Chave da IA fora do repositório e fora da tela: variável de ambiente ou arquivo ignorado pelo git.
+14. Sem dado de visitante (câmera, microfone, texto do público) indo para a IA sem combinar antes.
+
+**Convivência**
+15. A porta 8765 é do VFD Studio. Nada seu pode escutar nela.
+16. Mande `"origem"` com o nome do seu app em toda chamada: aparece no log e separa quem fez o quê.
+17. Avise antes de mudar ritmo ou formato das frases: a cena da tela foi ajustada para um tipo de texto.
+
+**Montagem**
+18. Teste nesta ordem: botão **Testar agora** da página → seu app apontando para o Mac mini → uma noite
+    inteira ligado antes de abrir ao público.
+
+## 11. Checklist de integração
 
 - [ ] Chamada `POST /api/v1/texto` com `texto` e `origem`.
 - [ ] `503` e conexão recusada tratados como "tente depois", sem travar.
