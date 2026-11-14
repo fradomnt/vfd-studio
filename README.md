@@ -1,12 +1,12 @@
 # VFD Studio
 
-**Desenvolvedor criativo:** Frado Monteiro · [frado.com.br](https://frado.com.br) · Tekne Studio
+**Desenvolvedor criativo:** Frado Monteiro · [frado.com.br](https://frado.com.br)
 
 Aplicação local para controlar a tela VFD gráfica **Noritake Itron GU256X128C-3900** (256×128 pontos)
 por um conversor USB-RS232. Roda em **Windows e macOS** com o mesmo código: um servidor Python sobe só
 no seu computador e abre a página em `http://127.0.0.1:8765`.
 
-Feita para a escultura *Devaneios do Aparato*: a tela fica dentro da peça, atrás de uma lente Fresnel.
+Pensada para instalações que ficam ligadas sem ninguém por perto: a tela pode ser lida atrás de uma lente.
 
 ## O que faz
 
@@ -52,14 +52,14 @@ Ligação elétrica e protocolo estão em [docs/ICD_tela_VFD.md](docs/ICD_tela_V
    - Se nada acontecer ao clicar, no Terminal: `chmod +x iniciar.command` e tente de novo.
 4. Abre uma janela do Terminal (o servidor) e o navegador abre a página. **Não feche o Terminal.**
 
-### Abrir sozinho ao ligar o Mac (museu)
+### Abrir sozinho ao ligar o Mac
 
 Duplo clique em `mac/instalar_inicio_automatico.command`. Ele registra o VFD Studio para abrir no login
 e reabrir se fechar. Depois, uma vez só, ligue o **login automático** em Ajustes do Sistema › Usuários
 e Grupos, senão após uma queda de luz o Mac para na tela de senha. Para desfazer:
 `mac/remover_inicio_automatico.command`.
 
-### Energia no museu: a tela não pode ficar acesa sem o computador
+### Energia: a tela não pode ficar acesa sem o computador
 
 A tela VFD **segura a última imagem para sempre** se continuar alimentada depois que o computador some
 (USB puxado, queda de luz com a fonte do visor em outra tomada, Mac desligado à força). Nenhum programa
@@ -141,7 +141,7 @@ opcional e pago à parte), testes automáticos (E6), e o rodízio de pixels guia
 
 ## Executável pronto (sem instalar Python)
 
-Para o museu e para quem não quer mexer com Python, há o app empacotado, com a logo frado no ícone:
+Para quem não quer mexer com Python, há o app empacotado, com a logo frado no ícone:
 
 - **Windows:** baixe `VFD-Studio-2.0-windows.zip` na página de
   [Releases](https://github.com/fradomnt/vfd-studio/releases), descompacte e dê duplo clique em
@@ -165,9 +165,8 @@ Releases: `gh release upload v2.0 dist/VFD-Studio-2.0-mac.zip`.
 
 ## Créditos
 
-- **Desenvolvimento criativo e direção:** Frado Monteiro — [frado.com.br](https://frado.com.br)
-- **Obra:** *Devaneios do Aparato*, Tekne Studio
-- **App de filosofias (IA) que alimenta a tela:** Marlus Araujo
+- **Desenvolvimento criativo:** Frado Monteiro — [frado.com.br](https://frado.com.br)
+- **Integração com o app que manda as frases:** Marlus Araujo
 - Fonte Roboto Condensed (SIL Open Font License). Tela Noritake Itron GU256X128C-3900.
 
 ## Hardware (fixo)

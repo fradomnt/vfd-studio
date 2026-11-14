@@ -1,6 +1,6 @@
 # Manual da API do VFD Studio — para integrar o app de filosofias
 
-Este manual é para quem vai escrever na tela VFD da escultura *Devaneios do Aparato* a partir de
+Este manual é para quem vai escrever na tela VFD controlada pelo VFD Studio a partir de
 outro programa. A ideia é simples: **o seu app manda o texto; o VFD Studio cuida de tudo o mais**
 (letra, acentos, tamanho, brilho, páginas, desgaste da tela, e o que mostrar quando você não manda nada).
 
@@ -10,7 +10,7 @@ Não é preciso saber nada da tela, da porta serial ou do protocolo Noritake.
 
 ## 1. Em 60 segundos
 
-O VFD Studio precisa estar aberto **no mesmo computador** (no museu, ele abre sozinho ao ligar o Mac
+O VFD Studio precisa estar aberto **no mesmo computador** (na instalação, ele abre sozinho ao ligar o Mac
 mini e fica em segundo plano). Então:
 
 ```bash
@@ -29,7 +29,7 @@ E a frase aparece na tela, palavra por palavra. Pronto: isso é 90 % da integra�
 
 ---
 
-## 2. Como testar sem a escultura
+## 2. Como testar sem a tela
 
 1. Clone o repositório e abra o VFD Studio (`iniciar.command` no Mac, `iniciar.bat` no Windows, ou o
    executável das [Releases](https://github.com/fradomnt/vfd-studio/releases)).
@@ -97,7 +97,7 @@ Não espera o tempo da frase acabar.
 
 Uma **cena** é um conjunto salvo no VFD Studio: espessura e tamanho da letra, espelhamento (para a
 lente), **brilho do visor**, o rodízio de frases que fica quando ninguém manda nada, e como as frases
-da API aparecem (modo, velocidade, tempo). Quem cria e ajusta cenas é a equipe da escultura, pela página.
+da API aparecem (modo, velocidade, tempo). Quem cria e ajusta cenas é quem opera o VFD Studio, pela página.
 
 Você só precisa do **nome**. Mandar `"cena": "noite"` troca tudo isso de uma vez, inclusive o brilho.
 Se não mandar, vale a cena padrão. A lista está em `GET /api/v1/estado` → `cenas`.
@@ -112,7 +112,7 @@ Se não mandar, vale a cena padrão. A lista está em `GET /api/v1/estado` → `
    a posição final de cada linha é calculada antes. É o modo que "parece que está escrevendo".
 3. **Modo `inteira`:** a frase aparece de uma vez, ~1 s depois da chamada.
 4. **Texto longo** vira páginas, com letra nunca menor que 18 pontos. Cada página fica
-   ~0,4 s por palavra (mínimo 3 s) e passa sozinha. Para a lente da escultura, até **~40 palavras**
+   ~0,4 s por palavra (mínimo 3 s) e passa sozinha. Lida atrás de uma lente, até **~40 palavras**
    é confortável; acima disso, o leitor já não acompanha.
 5. **Depois de `segundos`,** o rodízio da cena volta sozinho. A tela nunca fica vazia por falta de quem
    mande.
@@ -130,7 +130,7 @@ Se não mandar, vale a cena padrão. A lista está em `GET /api/v1/estado` → `
 |---|---|---|
 | `400` | texto vazio, longo demais, cena inexistente, campo inválido | corrigir; a mensagem em `erro` diz o quê |
 | `503` | tela desconectada (USB fora, fonte desligada, app acabou de abrir) | **tentar de novo em 10–30 s**. O VFD Studio reconecta sozinho a cada 3 s; não precisa avisar ninguém |
-| conexão recusada | VFD Studio não está aberto | esperar e tentar de novo; no museu ele reabre sozinho |
+| conexão recusada | VFD Studio não está aberto | esperar e tentar de novo; na instalação ele reabre sozinho |
 
 Boa prática: trate `503` e conexão recusada como "tela indisponível agora", sem travar o seu app, e
 registre no seu log. Ao ligar o Mac, o VFD Studio leva uns 5 s para conectar na tela.
@@ -229,7 +229,7 @@ Serve para saber que a frase terminou de aparecer (`exibindo` passa a `"api"` co
 **Conteúdo das frases**
 1. **Texto puro.** Sem markdown, asteriscos, listas, emojis ou símbolos: a fonte da tela não tem emoji
    nem alfabetos fora do latino, e eles viram quadradinhos. Acentos e cedilha funcionam.
-2. **Curto.** Até ~40 palavras; o ideal da escultura é uma frase de 1 a 3 linhas.
+2. **Curto.** Até ~40 palavras; o ideal é uma frase de 1 a 3 linhas.
 3. **Peça isso à IA no prompt:** "responda em texto puro, em português, no máximo 30 palavras, sem
    markdown, sem emojis". É mais barato do que limpar depois.
 4. **Varie as frases.** Texto fixo por horas marca a tela (foi assim que ela ficou com fantasmas).
@@ -244,8 +244,8 @@ Serve para saber que a frase terminou de aparecer (`exibindo` passa a `"api"` co
    plano. O seu app não pode depender de o VFD Studio responder.
 8. **Nunca trave por causa da IA.** Se a API de IA cair ou faltar internet, a tela volta ao rodízio
    sozinha; o seu app só não pode ficar numa tela de erro em cima do visitante.
-9. **Abra sozinho ao ligar o Mac e volte sozinho se fechar** (item de login + relançar). Queda de luz no
-   museu é certeza, não hipótese.
+9. **Abra sozinho ao ligar o Mac e volte sozinho se fechar** (item de login + relançar). Queda de luz numa
+   instalação é certeza, não hipótese.
 10. **Tela cheia de verdade:** sem cursor, sem barra, sem protetor de tela, sem diálogo de atualização.
 11. **Log em arquivo** do que mandou e do que a API respondeu. É o primeiro lugar onde se olha quando
     algo estranha.
@@ -274,8 +274,8 @@ Serve para saber que a frase terminou de aparecer (`exibindo` passa a `"api"` co
 - [ ] Testado com o botão **Testar agora** da página e depois com o seu app.
 
 Dúvidas e pedidos (fila em vez de cancelamento, outro comportamento ao terminar, mais eventos no
-WebSocket): abra uma issue no repositório ou fale com a equipe da escultura.
+WebSocket): abra uma issue no repositório.
 
 ---
 
-VFD Studio · desenvolvimento criativo: **Frado Monteiro** — [frado.com.br](https://frado.com.br) · Tekne Studio
+VFD Studio · desenvolvimento criativo: **Frado Monteiro** — [frado.com.br](https://frado.com.br)
