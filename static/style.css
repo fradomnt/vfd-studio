@@ -158,6 +158,8 @@ button.ocupado { cursor: progress; opacity: .7; }
 /* ------------------------------------------------------------- cena e autonomia */
 #cena-cartao h2::before { background: #FFD9B3; }   /* pêssego pastel */
 .duas { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.duas > div { min-width: 0; }            /* o <pre> não pode alargar a coluna */
+.guia code, .copiaveis code { overflow-wrap: anywhere; }
 @media (max-width: 760px) { .duas { grid-template-columns: 1fr; } }
 .cartao h3 { margin: 14px 0 8px; font: 800 13px var(--f-titulo); text-transform: uppercase; letter-spacing: .06em; }
 .cartao h3:first-child { margin-top: 0; }
@@ -172,5 +174,14 @@ input[type=text]:focus, input[type=number]:focus { outline: 3px solid var(--acen
 #cena-cartao textarea { font-size: 14px; }
 code { font: 12px var(--f-mono); background: var(--c-log); padding: 1px 5px; border-radius: 4px; }
 #exibindo { color: var(--acento-escuro); }
+.copiaveis code { font-size: 12px; padding: 6px 10px; border: 2px solid var(--linha); background: var(--cartao); user-select: all; }
+button.mini { padding: 5px 10px; font-size: 12px; box-shadow: none; }
+.guia { margin: 0 0 10px; padding-left: 20px; font-size: 14px; line-height: 1.5; }
+.guia li { margin-bottom: 6px; }
+.guia li::marker { font: 800 13px var(--f-mono); }
+.exemplo {
+  margin: 0 0 10px; padding: 12px 14px; border: 2px solid var(--linha); border-radius: var(--raio-p);
+  background: var(--tinta); color: var(--acento); font: 12px/1.5 var(--f-mono); white-space: pre; overflow-x: auto; max-width: 100%;
+}
 .brilho-cena input[type=range] { height: 28px; accent-color: var(--acento-escuro); }
 .brilho-cena output { font: 800 16px var(--f-mono); color: var(--tinta); min-width: 70px; }

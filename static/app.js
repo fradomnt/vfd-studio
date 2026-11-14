@@ -22,7 +22,7 @@ const el = {
   cenaApagar: $("cena-apagar"), apiModo: $("api-modo"), apiPpq: $("api-ppq"), apiSeg: $("api-seg"),
   autoConectar: $("auto-conectar"), autoExpo: $("auto-expo"), autoBv: $("auto-bv"), bvTexto: $("bv-texto"),
   bvSeg: $("bv-seg"), autoSalvar: $("auto-salvar"), exibindo: $("exibindo"), ultimaApi: $("ultima-api"),
-  cenaInfo: $("cena-info"),
+  cenaInfo: $("cena-info"), apiExemplo: $("api-exemplo"), apiCopiar: $("api-copiar"), apiTestar: $("api-testar"),
   testes: [...document.querySelectorAll("button.teste")],
 };
 const MSG_SERVIDOR_PARADO =
@@ -111,6 +111,7 @@ function atualizarBotoes() {
   el.iniciar.disabled = !conectado;
   el.textoEnviar.disabled = !conectado;
   el.logoEnviar.disabled = !conectado;
+  el.apiTestar.disabled = !conectado;
   for (const b of el.testes) b.disabled = !conectado;
   el.brilho.disabled = !conectado;
   el.expoIniciar.disabled = !conectado || expo.ativa || !rodizio.length;
@@ -435,6 +436,40 @@ el.cenaSalvar.addEventListener("click", () => acao(el.cenaSalvar, salvarCena));
 el.cenaAplicar.addEventListener("click", () => acao(el.cenaAplicar, aplicarCena));
 el.cenaApagar.addEventListener("click", () => acao(el.cenaApagar, apagarCena));
 el.autoSalvar.addEventListener("click", () => acao(el.autoSalvar, salvarAutomatico));
+const EXEMPLOS_API = {
+  curl: ["curl -X POST http://127.0.0.1:8765/api/v1/texto \\",
+         "  -H \"Content-Type: application/json\" \\",
+         "  -d '{\"texto\": \"A dúvida é o começo da sabedoria.\", \"origem\": \"meu-app\"}'"].join("\n"),
+  python: `import requests
+
+r = requests.post("http://127.0.0.1:8765/api/v1/texto",
+                  json={"texto": "A dúvida é o começo da sabedoria.", "origem": "meu-app"},
+                  timeout=5)
+print(r.json())   # {"ok": true, "cena": "museu", "modo": "palavra", ...}`,
+  js: `const r = await fetch("http://127.0.0.1:8765/api/v1/texto", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ texto: "A dúvida é o começo da sabedoria.", origem: "meu-app" }),
+});
+console.log(await r.json()); // { ok: true, cena: "museu", modo: "palavra", ... }`,
+};
+const elLing = $("api-ling");
+function mostrarExemploApi() { el.apiExemplo.textContent = EXEMPLOS_API[elLing.value]; }
+elLing.addEventListener("change", mostrarExemploApi);
+mostrarExemploApi();
+for (const b of document.querySelectorAll("button.copiar")) {
+  b.addEventListener("click", () => acao(b, async () => {
+    await navigator.clipboard.writeText($(b.dataset.alvo).textContent);
+    const antes = b.textContent; b.textContent = "Copiado"; setTimeout(() => { b.textContent = antes; }, 1500);
+  }));
+}
+el.apiCopiar.addEventListener("click", () => acao(el.apiCopiar, async () => {
+  await navigator.clipboard.writeText(el.apiExemplo.textContent);
+  el.apiCopiar.textContent = "Copiado"; setTimeout(() => { el.apiCopiar.textContent = "Copiar exemplo"; }, 1500);
+}));
+el.apiTestar.addEventListener("click", () => acao(el.apiTestar, () => api("/api/v1/texto", {
+  texto: "A dúvida é o começo da sabedoria.", origem: "teste da página", segundos: 20,
+})));
 carregarCenas().then(() => { const c = cenasVistas[el.cenaSel.value]; if (c) cenaParaPagina(c); })
   .catch((e) => mostrarErro(e.message));
 mostrarExpo();

@@ -137,7 +137,36 @@
           <div class="linha">
             <label class="ao-vivo">Fica <input type="number" id="api-seg" min="3" max="3600" value="90" class="num"> s e volta ao rodízio</label>
           </div>
-          <p class="dica">Endereço para o outro app: <code>POST http://127.0.0.1:8765/api/v1/texto</code> com <code>{"texto": "..."}</code>. Detalhes em <code>docs/API.md</code>.</p>
+          <h3>Para o outro app escrever na tela</h3>
+          <ol class="guia">
+            <li><strong>Onde:</strong> o outro app precisa rodar neste mesmo computador e chamar
+              <code>POST http://127.0.0.1:8765/api/v1/texto</code></li>
+            <li><strong>O que mandar:</strong> só o texto. <code>{"texto": "A dúvida é o começo da sabedoria."}</code><br>
+              Opcional: <code>"cena"</code> (nome de uma cena daqui), <code>"modo"</code> (<code>palavra</code> ou <code>inteira</code>), <code>"segundos"</code>.</li>
+            <li><strong>O que acontece:</strong> o rodízio pausa, a frase aparece do jeito da cena (letra, brilho, páginas) e, passado o tempo acima, o rodízio volta. Uma frase nova substitui a anterior.</li>
+            <li><strong>Se a tela estiver fora:</strong> resposta <code>503</code>; é só tentar de novo, o VFD Studio reconecta sozinho.</li>
+          </ol>
+          <div class="linha copiaveis">
+            <code id="api-url">http://127.0.0.1:8765/api/v1/texto</code>
+            <button class="secundario mini copiar" data-alvo="api-url">Copiar endereço</button>
+            <code id="api-corpo">{"texto": "A dúvida é o começo da sabedoria."}</code>
+            <button class="secundario mini copiar" data-alvo="api-corpo">Copiar JSON</button>
+          </div>
+          <div class="linha">
+            <label class="ao-vivo">Exemplo em
+              <select id="api-ling" aria-label="Linguagem do exemplo">
+                <option value="curl">curl (Terminal)</option>
+                <option value="python">Python</option>
+                <option value="js">JavaScript</option>
+              </select>
+            </label>
+          </div>
+          <pre class="exemplo" id="api-exemplo"></pre>
+          <div class="linha">
+            <button id="api-copiar" class="secundario" title="Copia o exemplo acima">Copiar exemplo</button>
+            <button id="api-testar" class="secundario" disabled title="Manda uma frase de teste pela API, como o outro app faria">Testar a API agora</button>
+            <span class="dica" style="margin:0">Guia completo, com Python e JavaScript: <code>docs/API.md</code> no repositório.</span>
+          </div>
         </div>
         <div>
           <h3>Automático</h3>
