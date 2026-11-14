@@ -18,7 +18,7 @@ Feita para a escultura *Devaneios do Aparato*: a tela fica dentro da peça, atr�
 - **Cenas** salvas em `cenas.json`: letra, tamanho, espelhar, brilho, rodízio e modo das frases da API.
 - **Autonomia:** ao ligar, acha o conversor sozinho, mostra boas-vindas na tela, liga o rodízio da cena
   padrão e reconecta se o USB sair. Frases que chegam pela API interrompem o rodízio; depois ele volta.
-- **API local** para outro programa escrever na tela: [docs/API.md](docs/API.md).
+- **API local** para outro programa escrever na tela. **Manual completo para integrar: [docs/API.md](docs/API.md).**
 - Log dos envios ao vivo.
 
 Pesquisa, decisões e próximos passos estão em [docs/PESQUISA.md](docs/PESQUISA.md).

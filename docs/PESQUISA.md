@@ -125,7 +125,35 @@ AliExpress às vezes trazem só o vidro, sem a placa: confirmar antes.
 - AliExpress: https://www.aliexpress.com/item/4000599297465.html
 - Mercado Livre, outro VFD Itron: https://produto.mercadolivre.com.br/MLB-2641685353-display-pw-898-101-visor-vfd-grafico-serial-112-x-16-itron-_JM
 
-## 10. Como abrir o app
+## 10. Decisões de 14/11/2026 (versão 2.0)
+
+**Arquitetura com o app do Marlus (sulram):** o app dele gera as filosofias com IA e manda só o texto
+para `POST http://127.0.0.1:8765/api/v1/texto`; o VFD Studio decide a forma pela **cena** e volta
+sozinho ao rodízio. Roda tudo no mesmo Mac mini: app dele em tela cheia, VFD Studio em segundo plano
+(sem janela, sem Dock). Linguagem do app dele ainda não informada; `docs/API.md` traz curl, Python e JS.
+Convite no GitHub enviado a sulram com escrita; em 14/11 ainda **pendente**.
+
+**O que a 2.0 faz sozinha:** conecta ao ligar e quando o USB volta; mostra boas-vindas
+("Tekne Studio / VFD pronto · hora / aguardando frases"); aplica o brilho da cena; liga o rodízio;
+guarda-tela (nenhuma imagem parada além do prazo: volta ao rodízio ou apaga; testes de pontos com prazo
+menor); apaga a tela e desliga o display ao encerrar e ao Desconectar; limpa duas vezes ao iniciar.
+Início automático no Mac por LaunchAgent (`mac/`).
+
+**Regra de energia (importante):** a tela segura a última imagem se ficar alimentada sem o computador
+(USB puxado, queda de luz com a fonte em outra tomada). Fonte do visor **sempre junto com o Mac**: mesma
+régua, ou alimentada pela USB do próprio Mac (confirmar corrente; 850 mA típicos). Mac configurado para
+religar após falta de energia e não dormir. Detalhes no README, seção "Energia no museu".
+
+**Executável:** PyInstaller via `vfd_studio.spec`; `windows/gerar_exe.bat` e `mac/gerar_app.command`;
+ícone com a assinatura frado; `.app` do Mac como agente (`LSUIElement`), gerado só no Mac.
+Release v2.0 com o zip Windows: https://github.com/fradomnt/vfd-studio/releases/tag/v2.0.
+Cópia local: `itau/VFD Studio 2.0/` (clone + `dist/VFD Studio/VFD Studio.exe`).
+
+**Pendências abertas:** teste real no Mac mini; linguagem do app do Marlus; horário de funcionamento;
+log em arquivo; vigia de travamento; botão "Testar autonomia"; `atualizar.command`; aviso remoto;
+rodízio de pixels (seção 6); fila vs. cancelamento de frases; logo_vfd.bin original ainda fora do repo.
+
+## 11. Como abrir o app
 
 Duplo clique em `vfd-studio/iniciar.bat` → Conectar → cartões Texto, Teste de pontos e Exposição.
 Página: http://127.0.0.1:8765 (a janela preta do servidor precisa ficar aberta).
