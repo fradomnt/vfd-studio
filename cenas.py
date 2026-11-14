@@ -38,7 +38,7 @@ CONFIG_PADRAO = {
     "auto_exposicao": True,        # depois de conectar, liga o rodízio da cena padrão
     "cena_padrao": "museu",
     "boas_vindas": True,           # mostra a mensagem abaixo na tela ao conectar
-    "boas_vindas_texto": "Tekne Studio\nVFD pronto · {hora}\naguardando frases",
+    "boas_vindas_texto": "VFD Studio\npronto · {hora}\naguardando frases",
     "boas_vindas_segundos": 8,     # depois disso entra o rodízio da cena (se auto_exposicao)
     # Guarda-tela: nenhuma imagem parada (boas-vindas, frase da API, envio manual, teste) fica mais
     # que isso. Vencido o prazo, volta ao rodízio da cena; sem rodízio, apaga a tela.

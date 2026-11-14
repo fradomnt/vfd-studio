@@ -45,7 +45,7 @@ if sys.platform == "darwin":
         coll,
         name=f"{NOME}.app",
         icon=ICONE,
-        bundle_identifier="studio.tekne.vfdstudio",
+        bundle_identifier="br.com.frado.vfdstudio",
         info_plist={
             "CFBundleShortVersionString": "2.0",
             "CFBundleName": NOME,

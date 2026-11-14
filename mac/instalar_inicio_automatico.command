@@ -1,17 +1,17 @@
 #!/bin/bash
 # Faz o VFD Studio abrir sozinho sempre que o Mac ligar (e reabrir se fechar).
-# Cria um LaunchAgent do usuário: ~/Library/LaunchAgents/studio.tekne.vfdstudio.plist
+# Cria um LaunchAgent do usuário: ~/Library/LaunchAgents/br.com.frado.vfdstudio.plist
 # Para desfazer: remover_inicio_automatico.command
 cd "$(dirname "$0")/.." || exit 1
 PASTA="$(pwd)"
-PLIST="$HOME/Library/LaunchAgents/studio.tekne.vfdstudio.plist"
+PLIST="$HOME/Library/LaunchAgents/br.com.frado.vfdstudio.plist"
 mkdir -p "$HOME/Library/LaunchAgents" "$PASTA/logs"
 
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>studio.tekne.vfdstudio</string>
+  <key>Label</key><string>br.com.frado.vfdstudio</string>
   <key>ProgramArguments</key><array>
     <string>/bin/bash</string><string>$PASTA/iniciar.command</string><string>--sem-pausa</string>
   </array>
@@ -28,8 +28,8 @@ cat > "$PLIST" <<EOF
 </dict></plist>
 EOF
 
-launchctl bootout "gui/$(id -u)/studio.tekne.vfdstudio" 2>/dev/null
-launchctl bootstrap "gui/$(id -u)" "$PLIST" && launchctl kickstart -k "gui/$(id -u)/studio.tekne.vfdstudio"
+launchctl bootout "gui/$(id -u)/br.com.frado.vfdstudio" 2>/dev/null
+launchctl bootstrap "gui/$(id -u)" "$PLIST" && launchctl kickstart -k "gui/$(id -u)/br.com.frado.vfdstudio"
 echo
 echo "Pronto. O VFD Studio agora abre sozinho ao ligar o Mac e reabre se fechar."
 echo "Página: http://127.0.0.1:8765   Logs: $PASTA/logs/"
