@@ -421,6 +421,7 @@ class Dialogo:
         self.thread = None
         self.seq = 0
         self.terminou = True
+        self.fase = "fim"                   # "fala" | "destaque" | "fim": onde a escrita está
         self.volta_em = None                # quando o rodízio volta, se não chegar fala nova
         self.passo = 0                      # índice em DESLOCAMENTOS: anda a cada fala
 
@@ -429,7 +430,9 @@ dialogo = Dialogo()
 
 
 def resumo_dialogo():
-    return {"seq": dialogo.seq, "terminou": dialogo.terminou}
+    """Vai no estado e no /ws. `fase` deixa o app que manda saber quando o destaque começou a aparecer,
+    para a tela grande dele mostrar a mesma frase no mesmo instante."""
+    return {"seq": dialogo.seq, "terminou": dialogo.terminou, "fase": dialogo.fase}
 
 
 def _escrever(texto, cena, nome_cena, modo, segundos, peso, tamanho, origem):
@@ -539,10 +542,14 @@ def _escrever_dialogo(fala, destaque, cena, nome_cena, origem, meu):
                     return
                 if dialogo.cancelar.is_set():
                     return
+                if rev_dest > 0 and dialogo.fase != "destaque":
+                    dialogo.fase = "destaque"
+                    publicar_status()
                 tela_img = Image.new("1", (driver.W, driver.H), 0)
                 tela_img.paste(fluxo.desenhar(lay, rev_fala, rev_dest), (dx, dy))
                 mostrar(presets.espelhar(tela_img, cena["espelhar_h"], cena["espelhar_v"]), "dialogo")
             dialogo.terminou = True
+            dialogo.fase = "fim"
             dialogo.volta_em = time.time() + cena["dialogo_segundos"]
             estado.ultima_api = {"texto": fala[:120], "destaque": destaque[:80], "cena": nome_cena,
                                  "hora": time.strftime("%H:%M:%S"), "origem": origem}
@@ -552,6 +559,7 @@ def _escrever_dialogo(fala, destaque, cena, nome_cena, origem, meu):
                               f"{cena['dialogo_segundos']} s sem fala nova.")
         except Exception as e:
             dialogo.terminou = True             # quem espera o término não pode ficar preso num erro
+            dialogo.fase = "fim"
             publicar_status()
             registrar("erro", f"API: não consegui escrever a fala #{meu}. {e}")
 
@@ -580,6 +588,7 @@ def exibir_dialogo(fala, destaque, nome_cena=None, origem="api"):
     dialogo.seq += 1
     meu = dialogo.seq
     dialogo.terminou = False
+    dialogo.fase = "fala"
     dialogo.volta_em = None
     dialogo.passo += 1
     dialogo.thread = threading.Thread(target=_escrever_dialogo, args=(fala, destaque, cena, nome, origem, meu),

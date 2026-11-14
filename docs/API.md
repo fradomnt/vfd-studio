@@ -127,9 +127,11 @@ O que acontece:
 3. **O destaque** entra depois da fala inteira, embaixo dela, centralizado, no mesmo ritmo. O lugar dele
    é reservado desde o início, então a fala não se desloca quando ele chega.
 4. **Fala longa** rola como um terminal: a janela termina na linha que está sendo escrita.
-5. **Terminou:** `GET /api/v1/estado` passa a trazer `"dialogo": {"seq": 12, "terminou": true}`, e o
-   mesmo objeto vai no `status` do WebSocket. Espere isso antes de mandar a próxima fala; se `seq` no
-   estado já for maior que o seu, a sua foi atropelada por outra e não vai terminar.
+5. **Terminou:** `GET /api/v1/estado` passa a trazer `"dialogo": {"seq": 12, "terminou": true, "fase": "fim"}`,
+   e o mesmo objeto vai no `status` do WebSocket. Espere isso antes de mandar a próxima fala; se `seq`
+   no estado já for maior que o seu, a sua foi atropelada por outra e não vai terminar. `fase` passa de
+   `fala` a `destaque` no instante em que o destaque começa a aparecer: serve para outra tela do seu app
+   mostrar a mesma frase no mesmo momento.
 6. **Depois de `segundos`** sem fala nova, o rodízio da cena volta. Enquanto a fala está sendo escrita
    o guarda-tela não a interrompe.
 
@@ -167,7 +169,7 @@ dizer("A dúvida não é o contrário da certeza.", destaque="O que resta é o e
  "tela": {"largura": 256, "altura": 128}}
 ```
 
-`dialogo`: `{"seq": N, "terminou": bool}` da última fala de `/dialogo`.
+`dialogo`: `{"seq": N, "terminou": bool, "fase": "fala" | "destaque" | "fim"}` da última fala de `/dialogo`.
 `exibindo`: `boas-vindas`, `rodizio`, `api` (sua frase), `dialogo` (a fala da obra), `quadro` (seu bitmap), `manual`, `teste` ou
 `nada` (apagada). `simulado` diz se é a tela simulada (seção 2). `bitmap_parcial` diz se o envio por
 região está ligado (seção 3b).
