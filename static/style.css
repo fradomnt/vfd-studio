@@ -147,6 +147,7 @@ button.ocupado { cursor: progress; opacity: .7; }
 .expo-lista .frase { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .expo-lista .meta { font: 11px var(--f-mono); color: var(--tinta-fraca); }
 .expo-lista li.atual .meta { color: var(--tinta); }
-.expo-lista button { padding: 4px 12px; font-size: 12px; box-shadow: none; }
+.expo-lista button { padding: 4px 12px; font-size: 12px; box-shadow: none; background: var(--c-teste) !important; }
+.expo-lista button:hover:not(:disabled) { background: var(--alerta) !important; color: #fff; }
 #expo-seg { width: 78px; padding: 7px 10px; font: 600 14px var(--f-mono); }
 #expo-info.ativa { color: var(--acento-escuro); font-weight: 700; }
