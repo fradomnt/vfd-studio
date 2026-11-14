@@ -174,11 +174,18 @@ def mensagem_erro(e):
     return f"Erro na serial: {txt}"
 
 
-def _fechar_tela(motivo=None):
-    """Fecha a porta e volta ao estado desconectado. Chamar com o lock já tomado ou sem tela em uso."""
+def _fechar_tela(motivo=None, apagar=False):
+    """Fecha a porta e volta ao estado desconectado. Chamar com o lock já tomado ou sem tela em uso.
+    apagar=True (desconexão pedida pelo usuário): limpa a tela antes, para não ficar imagem parada."""
     expo.parar_ev.set()                     # sem tela, a exposição para sozinha
     escrita.cancelar.set()
     if estado.tela is not None:
+        if apagar:
+            try:
+                estado.tela.limpar()
+                estado.tela.desligar()
+            except Exception:
+                pass                        # a porta pode já ter sumido
         estado.tela.fechar()
     estado.tela = None
     estado.exibindo = "nada"
@@ -647,15 +654,18 @@ async def conectar(pedido: PedidoConectar):
 @app.post("/api/desconectar")
 async def desconectar():
     def fechar():
+        parar_exposicao()
         with estado.lock:
-            _fechar_tela()
+            _fechar_tela(apagar=True)
     try:
         await na_serial(fechar)
     except Exception as e:
         return resposta_erro(e)
     # desconectar à mão desliga a conexão automática, senão ela reconecta em 3 s
-    cfg = cenas.salvar_config({"auto_conectar": False})
-    registrar("info", "Desconectado. A conexão automática foi desligada; religue no cartão Cena e autonomia.")
+    cenas.salvar_config({"auto_conectar": False})
+    estado.previa = bytes(len(estado.previa))
+    publicar_previa()
+    registrar("info", "Tela apagada e desconectada. A conexão automática foi desligada; religue no cartão Automático.")
     publicar_status()
     return {"ok": True, **status_atual()}
 

@@ -57,6 +57,33 @@ e reabrir se fechar. Depois, uma vez só, ligue o **login automático** em Ajust
 e Grupos, senão após uma queda de luz o Mac para na tela de senha. Para desfazer:
 `mac/remover_inicio_automatico.command`.
 
+### Energia no museu: a tela não pode ficar acesa sem o computador
+
+A tela VFD **segura a última imagem para sempre** se continuar alimentada depois que o computador some
+(USB puxado, queda de luz com a fonte do visor em outra tomada, Mac desligado à força). Nenhum programa
+consegue apagar uma tela com a qual não fala mais, e imagem parada por horas é o que mais queima o
+fósforo. O app já apaga a tela ao encerrar de forma normal; o resto é montagem:
+
+1. **Fonte do visor junto com o Mac mini.** As duas na **mesma régua** (ou na mesma tomada inteligente).
+   Caiu a luz, caem os dois; desligou o Mac pela régua, a tela apaga junto. Nunca deixe a fonte do visor
+   numa tomada separada.
+2. **Melhor ainda: alimentar a tela pela USB do próprio Mac mini** (ou de um hub ligado nele), com um
+   cabo USB → 5 V no pino 6 do CN1. Aí a tela só tem energia enquanto o Mac está ligado, sem régua.
+   Confirme antes a corrente da tela: a ficha da série indica 850 mA típicos para o modelo C; uma porta
+   USB-C do Mac mini fornece até 1,5 A, uma USB-A 0,9 A. Se o pico passar disso, fique na régua.
+   Isso muda só a **origem** dos 5 V; os fios de dados validados continuam iguais.
+3. **Mac mini: ligar sozinho quando a energia voltar.** Ajustes do Sistema › Energia › "Iniciar
+   automaticamente após falta de energia" (ou, no Terminal, `sudo pmset -a autorestart 1`). Junto com o
+   login automático e o `instalar_inicio_automatico.command`, a sequência depois de uma queda de luz
+   fica: energia volta → Mac liga → usuário entra → VFD Studio abre → conecta → limpa a tela → rodízio.
+4. **Nunca deixe o Mac dormir:** Ajustes do Sistema › Energia › "Impedir repouso automático" (ou
+   `sudo pmset -a sleep 0 disksleep 0`). Mac dormindo = USB sem comando = imagem parada.
+5. **Antes de puxar o USB ou desligar a fonte** para manutenção: clique em **Desconectar** na página
+   (a tela é apagada antes de a porta fechar) ou feche o app.
+
+O log do app registra a hora em que a conexão caiu e voltou. Se a tela ficou parada por muitas horas,
+deixe-a apagada por um tempo equivalente antes de voltar à exposição.
+
 ### Pela linha de comando (qualquer sistema)
 
 ```bash
