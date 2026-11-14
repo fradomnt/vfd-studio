@@ -10,6 +10,11 @@
   --linha: #0F0F0F;
   --acento: #5FF0D0;             /* cor física da tela */
   --acento-escuro: #15B094;
+  /* cor por função dos cartões: conexão (interruptor), teste (gasta a tela), exposição (modo peça) */
+  --c-conexao: #FFE14D;
+  --c-teste: #FFB4A8;
+  --c-expo: #D9C8FF;
+  --c-log: #ECECE8;
   --alerta: #FF5A36;
   --alerta-fundo: #FFE9E3;
   --vfd-fundo: #0B1214;
@@ -51,13 +56,29 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 15px/1.45
 }
 .largo { grid-column: 1 / -1; }
 @media (max-width: 900px) { .grade { grid-template-columns: 1fr; padding: 16px; gap: 18px; } }
+/* janela estreita: cabeçalho compacto e não fixo, senão ele come um terço da tela */
+@media (max-width: 700px) {
+  .topo { position: static; padding: 12px 16px; gap: 10px; }
+  .topo .logo { height: 34px; }
+  .topo h1 { font-size: 19px; }
+  .modelo { display: none; }
+}
 
 .cartao {
   background: var(--cartao); border: 2px solid var(--linha); border-radius: var(--raio);
   padding: 20px 22px; box-shadow: var(--sombra); min-width: 0;
 }
+#conexao { background: var(--c-conexao); }
+#teste-cartao { background: var(--c-teste); }
+#expo-cartao { background: var(--c-expo); }
+#log-cartao { background: var(--c-log); }
+/* dentro dos cartões coloridos, campos e botões claros continuam brancos para destacar */
+#conexao select, #expo-cartao #expo-seg, #expo-cartao .expo-lista li,
+#conexao button.secundario, #teste-cartao button.secundario, #expo-cartao button.secundario { background: var(--cartao); }
+#conexao .dica, #teste-cartao .dica, #expo-cartao .dica { color: #3A3A36; }
 .cartao h2 { margin: 0 0 14px; font: 800 17px var(--f-titulo); letter-spacing: -.02em; display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
 .cartao h2 small { font: 500 12px var(--f-mono); color: var(--tinta-fraca); }
+#conexao h2 small, #teste-cartao h2 small, #expo-cartao h2 small { color: #3A3A36; }
 
 /* -------------------------------------------------------------- controles */
 .linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
@@ -79,7 +100,7 @@ button {
 button:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--linha); }
 button:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--linha); }
 button.secundario { background: var(--cartao); color: var(--tinta); }
-button.secundario:hover:not(:disabled) { background: var(--acento); }
+button.secundario:hover:not(:disabled) { background: var(--acento) !important; }
 button:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; transform: none; }
 button.ocupado { cursor: progress; opacity: .7; }
 
