@@ -17,6 +17,7 @@ import base64
 import collections
 import concurrent.futures
 import contextlib
+import os
 import threading
 import time
 import webbrowser
@@ -462,6 +463,35 @@ def boas_vindas():
     mostrar(presets.espelhar(img, cena["espelhar_h"], cena["espelhar_v"]), "boas-vindas")
 
 
+def iniciar_e_apagar_duas_vezes(tela):
+    """Ao iniciar: 1B 40 e dois 0C seguidos, rápido. Garante tela limpa mesmo que o primeiro
+    comando chegue com a tela ainda acordando."""
+    tela.iniciar()
+    tela.limpar()
+    time.sleep(0.15)
+    tela.limpar()
+    estado.previa = bytes(len(estado.previa))
+    estado.exibindo = "nada"
+    estado.parado_desde = None
+    publicar_previa()
+
+
+def apagar_ao_sair():
+    """Ao encerrar o app: apaga a tela e desliga o display, para não ficar imagem parada queimando."""
+    with estado.lock:
+        if estado.tela is None:
+            return
+        try:
+            estado.tela.limpar()
+            estado.tela.desligar()
+            print("Tela apagada ao sair.")
+        except Exception as e:
+            print(f"Não consegui apagar a tela ao sair: {e}")
+        finally:
+            estado.tela.fechar()
+            estado.tela = None
+
+
 def conectar_sozinho():
     """Procura o conversor, conecta, inicializa, aplica o brilho da cena e mostra as boas-vindas.
     Roda na thread da autonomia. Devolve True se conectou."""
@@ -483,7 +513,7 @@ def conectar_sozinho():
     registrar("info", f"Conectado sozinho em {porta} @ 38400 8N1.")
     publicar_status()
     try:
-        com_tela(lambda t: t.iniciar())
+        com_tela(iniciar_e_apagar_duas_vezes)
         nome, cena = cena_atual()
         aplicar_brilho(cena["brilho"])
         boas_vindas()
@@ -554,10 +584,11 @@ async def ciclo_de_vida(_app):
     yield
     escrita.cancelar.set()
     expo.parar_ev.set()
-    with estado.lock:
-        if estado.tela is not None:
-            estado.tela.fechar()
-            estado.tela = None
+    if expo.thread and expo.thread.is_alive():
+        expo.thread.join(timeout=3)
+    if escrita.thread and escrita.thread.is_alive():
+        escrita.thread.join(timeout=3)
+    apagar_ao_sair()
 
 
 app = FastAPI(title="VFD Studio", docs_url=None, redoc_url=None, openapi_url=None,
@@ -635,15 +666,12 @@ async def inicializar():
     parar_exposicao("a tela foi inicializada")
     escrita.cancelar.set()
     try:
-        await na_serial(com_tela, lambda t: t.iniciar())
+        await na_serial(com_tela, iniciar_e_apagar_duas_vezes)
     except Exception as e:
         return resposta_erro(e)
-    estado.previa = bytes(len(estado.previa))
     estado.brilho = 8
-    estado.exibindo = "nada"
-    publicar_previa()
     publicar_status()
-    registrar("info", "Tela inicializada (1B 40): apagada, brilho 100 %.")
+    registrar("info", "Tela inicializada (1B 40) e apagada duas vezes; brilho 100 %.")
     return {"ok": True}
 
 
@@ -901,10 +929,16 @@ app.mount("/static", StaticFiles(directory=PASTA / "static"), name="static")
 
 # ====================================================================== main
 def main():
+    import atexit
+    import signal
     import uvicorn
+    atexit.register(apagar_ao_sair)
+    # SIGTERM (launchctl, kill) → uvicorn encerra com graça e o ciclo_de_vida apaga a tela;
+    # SIGHUP (janela do Terminal fechada no Mac) não é tratado pelo uvicorn: apagamos e saímos.
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, lambda *_: (apagar_ao_sair(), os._exit(0)))
     url = f"http://{HOST}:{PORTA_HTTP}"
     print(f"VFD Studio em {url}  (Ctrl+C para sair)")
-    import os
     if not os.environ.get("VFD_SEM_NAVEGADOR"):      # no início automático do Mac não há quem veja
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     uvicorn.run(app, host=HOST, port=PORTA_HTTP, log_level="warning")
