@@ -61,7 +61,8 @@ class Estado:
         # Prévia: os mesmos 4096 bytes do formato da tela (colunas, bit7 = ponto de cima).
         self.previa = bytes(driver.W * driver.H // 8)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="serial")
-        self.exibindo = "nada"              # nada | boas-vindas | rodizio | api | manual
+        self.exibindo = "nada"              # nada | boas-vindas | rodizio | api | manual | teste
+        self.parado_desde = None            # quando a imagem atual (não rodízio) entrou na tela
         self.ultima_api = None              # resumo da última frase recebida pela API
 
     @property
@@ -151,6 +152,8 @@ def mostrar(img, origem):
     com_tela(lambda t: t.bitmap(img))
     estado.previa = driver.VFD._codificar(img)
     estado.exibindo = origem
+    # tela apagada não gasta; rodízio se cuida sozinho; o resto tem prazo (guarda-tela)
+    estado.parado_desde = None if origem in ("rodizio", "nada") or not any(estado.previa) else time.time()
     publicar_previa()
 
 
@@ -496,6 +499,26 @@ def conectar_sozinho():
     return True
 
 
+def guarda_tela(cfg):
+    """Imagem parada há tempo demais: volta ao rodízio ou apaga. Protege o fósforo da tela."""
+    if not cfg["guarda_tela"] or not estado.conectado or estado.parado_desde is None:
+        return
+    if escrita.thread and escrita.thread.is_alive() and estado.exibindo == "api":
+        return                                  # frase da API ainda sendo escrita (quadros mudando)
+    limite = cfg["teste_segundos"] if estado.exibindo == "teste" else cfg["guarda_tela_segundos"]
+    if time.time() - estado.parado_desde < limite:
+        return
+    motivo = f"guarda-tela: \"{estado.exibindo}\" parado há {int(time.time() - estado.parado_desde)} s"
+    if escrita.volta:
+        escrita.volta.cancel()
+    nome, cena = cena_atual()
+    if cfg["auto_exposicao"] and cena["rodizio"]:
+        voltar_ao_rodizio(motivo)
+    else:
+        mostrar(Image.new("1", (driver.W, driver.H), 0), "nada")
+        registrar("info", f"Tela apagada ({motivo}).")
+
+
 def laco_autonomia():
     """A cada 3 s: se configurado e desconectado, tenta conectar. Se conectado, vigia se a porta sumiu."""
     time.sleep(1.5)
@@ -513,6 +536,7 @@ def laco_autonomia():
                                             else "Plugue o USB e clique em Conectar."))
             elif cfg["auto_conectar"]:
                 conectar_sozinho()
+            guarda_tela(cfg)
         except Exception as e:
             registrar("erro", f"Vigia: {e}")
         time.sleep(3)
@@ -639,7 +663,7 @@ def _desenhar(pedido):
     if pedido.tipo == "teste":
         img = presets.desenhar_padrao(pedido.padrao)
         descricao = f"Teste de pontos: {presets.PADROES[pedido.padrao]}."
-        info = {}
+        info = {"origem": "teste"}
     elif pedido.tipo == "logo":
         img = Image.open(PASTA / "assets" / "logo_vfd_256x128.png").convert("1")
         descricao = "Logo frado enviada."
@@ -680,7 +704,7 @@ async def enviar_desenho(pedido: PedidoDesenho):
         escrita.volta.cancel()
     try:
         img, dados, descricao, info = _desenhar(pedido)
-        await na_serial(mostrar, img, "manual")
+        await na_serial(mostrar, img, info.pop("origem", "manual"))
     except Exception as e:
         return resposta_erro(e)
     registrar("info", descricao)

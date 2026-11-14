@@ -21,7 +21,7 @@ const el = {
   cenaSel: $("cena-sel"), cenaNome: $("cena-nome"), cenaSalvar: $("cena-salvar"), cenaAplicar: $("cena-aplicar"),
   cenaApagar: $("cena-apagar"), apiModo: $("api-modo"), apiPpq: $("api-ppq"), apiSeg: $("api-seg"),
   autoConectar: $("auto-conectar"), autoExpo: $("auto-expo"), autoBv: $("auto-bv"), bvTexto: $("bv-texto"),
-  bvSeg: $("bv-seg"), autoSalvar: $("auto-salvar"), exibindo: $("exibindo"), ultimaApi: $("ultima-api"),
+  bvSeg: $("bv-seg"), autoSalvar: $("auto-salvar"), guarda: $("guarda"), guardaSeg: $("guarda-seg"), testeSeg: $("teste-seg"), exibindo: $("exibindo"), ultimaApi: $("ultima-api"),
   cenaInfo: $("cena-info"), apiExemplo: $("api-exemplo"), apiCopiar: $("api-copiar"), apiTestar: $("api-testar"),
   testes: [...document.querySelectorAll("button.teste")],
 };
@@ -97,7 +97,7 @@ function aplicarStatus(s) {
   if (s.exposicao) expo = s.exposicao;
   if (s.config) mostrarConfig(s.config);
   if (s.exibindo) {
-    const nomes = { nada: "nada", "boas-vindas": "boas-vindas", rodizio: "rodízio", api: "frase da API", manual: "envio manual" };
+    const nomes = { nada: "nada", "boas-vindas": "boas-vindas", rodizio: "rodízio", api: "frase da API", manual: "envio manual", teste: "teste de pontos" };
     el.exibindo.textContent = nomes[s.exibindo] || s.exibindo;
   }
   if (s.ultima_api) el.ultimaApi.textContent = `Última da API às ${s.ultima_api.hora}: “${s.ultima_api.texto}”`;
@@ -243,6 +243,9 @@ function mostrarConfig(cfg) {
   el.autoBv.checked = !!cfg.boas_vindas;
   if (document.activeElement !== el.bvTexto) el.bvTexto.value = cfg.boas_vindas_texto || "";
   el.bvSeg.value = cfg.boas_vindas_segundos || 8;
+  el.guarda.checked = cfg.guarda_tela !== false;
+  el.guardaSeg.value = cfg.guarda_tela_segundos || 120;
+  el.testeSeg.value = cfg.teste_segundos || 30;
   el.cenaInfo.textContent = `cena padrão: ${cfg.cena_padrao}`;
 }
 
@@ -312,6 +315,8 @@ function salvarAutomatico() {
   return api("/api/config", {
     auto_conectar: el.autoConectar.checked, auto_exposicao: el.autoExpo.checked, boas_vindas: el.autoBv.checked,
     boas_vindas_texto: el.bvTexto.value, boas_vindas_segundos: Number(el.bvSeg.value) || 8,
+    guarda_tela: el.guarda.checked, guarda_tela_segundos: Number(el.guardaSeg.value) || 120,
+    teste_segundos: Number(el.testeSeg.value) || 30,
   });
 }
 
@@ -422,7 +427,7 @@ el.texto.addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey) && conectado) { ev.preventDefault(); enviarTexto(); }
 });
 for (const b of el.testes) b.addEventListener("click", () => acao(b, () => enviarTeste(b)));
-el.brilho.addEventListener("input", () => { el.brilhoValor.textContent = `${el.brilho.value} de 8`; el.cenaInfo.textContent = `brilho ${el.brilho.value} ainda não salvo na cena — clique em Salvar cena`; });
+el.brilho.addEventListener("input", () => { el.brilhoValor.textContent = `${el.brilho.value} de 8`; el.cenaInfo.textContent = `brilho ${el.brilho.value} · não salvo na cena`; });
 el.brilho.addEventListener("change", () => acao(el.brilho, () => api("/api/brilho", { nivel: Number(el.brilho.value) })));
 el.expoAdd.addEventListener("click", () => acao(el.expoAdd, async () => adicionarAoRodizio()));
 el.expoIniciar.addEventListener("click", () => acao(el.expoIniciar, iniciarExpo));
@@ -456,6 +461,8 @@ console.log(await r.json()); // { ok: true, cena: "museu", modo: "palavra", ... 
 const elLing = $("api-ling");
 function mostrarExemploApi() { el.apiExemplo.textContent = EXEMPLOS_API[elLing.value]; }
 elLing.addEventListener("change", mostrarExemploApi);
+function modoMudou() { document.querySelector(".so-palavra").hidden = el.apiModo.value !== "palavra"; }
+el.apiModo.addEventListener("change", modoMudou); modoMudou();
 mostrarExemploApi();
 for (const b of document.querySelectorAll("button.copiar")) {
   b.addEventListener("click", () => acao(b, async () => {

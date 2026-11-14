@@ -102,85 +102,88 @@
       </div>
     </section>
 
-    <!-- Cena e autonomia -->
-    <section class="cartao largo" id="cena-cartao">
-      <h2>Cena e autonomia <small id="cena-info">o que a tela faz sozinha no museu</small></h2>
-      <div class="duas">
-        <div>
-          <h3>Brilho do visor</h3>
-          <div class="linha tamanho brilho-cena">
-            <input type="range" id="brilho" min="1" max="8" value="8" disabled aria-label="Brilho do visor">
-            <output id="brilho-valor">8 de 8</output>
-          </div>
-          <p class="dica">Vale na hora e fica salvo na cena. É o ajuste que mais protege a tela: use o menor nível que ainda dê para ler com a lente. Cada cena aplica o seu brilho ao entrar (rodízio, frase da API, boas-vindas).</p>
-          <h3>Cena</h3>
-          <p class="dica">Uma cena guarda brilho, letra, tamanho, espelhar, rodízio e como as frases da API aparecem. Fica em <code>cenas.json</code>.</p>
-          <div class="linha">
-            <select id="cena-sel" aria-label="Cenas salvas"></select>
-            <button id="cena-aplicar" class="secundario" title="Vira a cena padrão: aplica o brilho e liga o rodízio dela">Aplicar</button>
-            <button id="cena-apagar" class="secundario">Apagar</button>
-          </div>
-          <div class="linha">
-            <input type="text" id="cena-nome" placeholder="nome da cena" maxlength="40" aria-label="Nome da cena">
-            <button id="cena-salvar" title="Guarda os ajustes atuais da página (letra, tamanho, espelhar, brilho, rodízio) com esse nome">Salvar cena</button>
-          </div>
-          <h3>Frases da API</h3>
-          <div class="linha">
-            <label class="ao-vivo">Modo
-              <select id="api-modo" aria-label="Modo de escrita">
-                <option value="palavra">palavra por palavra</option>
-                <option value="inteira">frase inteira</option>
-              </select>
-            </label>
-            <label class="ao-vivo"><input type="number" id="api-ppq" min="1" max="5" value="1" class="num"> palavra(s) por quadro</label>
-          </div>
-          <div class="linha">
-            <label class="ao-vivo">Fica <input type="number" id="api-seg" min="3" max="3600" value="90" class="num"> s e volta ao rodízio</label>
-          </div>
-          <h3>Para o outro app escrever na tela</h3>
-          <ol class="guia">
-            <li><strong>Onde:</strong> o outro app precisa rodar neste mesmo computador e chamar
-              <code>POST http://127.0.0.1:8765/api/v1/texto</code></li>
-            <li><strong>O que mandar:</strong> só o texto. <code>{"texto": "A dúvida é o começo da sabedoria."}</code><br>
-              Opcional: <code>"cena"</code> (nome de uma cena daqui), <code>"modo"</code> (<code>palavra</code> ou <code>inteira</code>), <code>"segundos"</code>.</li>
-            <li><strong>O que acontece:</strong> o rodízio pausa, a frase aparece do jeito da cena (letra, brilho, páginas) e, passado o tempo acima, o rodízio volta. Uma frase nova substitui a anterior.</li>
-            <li><strong>Se a tela estiver fora:</strong> resposta <code>503</code>; é só tentar de novo, o VFD Studio reconecta sozinho.</li>
-          </ol>
-          <div class="linha copiaveis">
-            <code id="api-url">http://127.0.0.1:8765/api/v1/texto</code>
-            <button class="secundario mini copiar" data-alvo="api-url">Copiar endereço</button>
-            <code id="api-corpo">{"texto": "A dúvida é o começo da sabedoria."}</code>
-            <button class="secundario mini copiar" data-alvo="api-corpo">Copiar JSON</button>
-          </div>
-          <div class="linha">
-            <label class="ao-vivo">Exemplo em
-              <select id="api-ling" aria-label="Linguagem do exemplo">
-                <option value="curl">curl (Terminal)</option>
-                <option value="python">Python</option>
-                <option value="js">JavaScript</option>
-              </select>
-            </label>
-          </div>
-          <pre class="exemplo" id="api-exemplo"></pre>
-          <div class="linha">
-            <button id="api-copiar" class="secundario" title="Copia o exemplo acima">Copiar exemplo</button>
-            <button id="api-testar" class="secundario" disabled title="Manda uma frase de teste pela API, como o outro app faria">Testar a API agora</button>
-            <span class="dica" style="margin:0">Guia completo, com Python e JavaScript: <code>docs/API.md</code> no repositório.</span>
-          </div>
-        </div>
-        <div>
-          <h3>Automático</h3>
-          <label class="ao-vivo bloco"><input type="checkbox" id="auto-conectar"> Conectar sozinho ao ligar e sempre que o USB voltar</label>
-          <label class="ao-vivo bloco"><input type="checkbox" id="auto-expo"> Ligar o rodízio da cena padrão depois de conectar</label>
-          <label class="ao-vivo bloco"><input type="checkbox" id="auto-bv"> Mostrar boas-vindas na tela ao conectar</label>
-          <textarea id="bv-texto" rows="3" maxlength="200" aria-label="Texto das boas-vindas"></textarea>
-          <div class="linha">
-            <label class="ao-vivo">Boas-vindas por <input type="number" id="bv-seg" min="1" max="600" value="8" class="num"> s</label>
-            <button id="auto-salvar">Salvar automático</button>
-          </div>
-          <p class="dica"><code>{hora}</code> vira a hora atual. Agora na tela: <strong id="exibindo">nada</strong>. <span id="ultima-api"></span></p>
-        </div>
+    <!-- Cena -->
+    <section class="cartao" id="cena-cartao">
+      <h2>Cena <small id="cena-info">cena padrão: museu</small></h2>
+
+      <div class="brilho-cena">
+        <div class="rotulo-linha"><span>Brilho do visor</span><output id="brilho-valor">8 de 8</output></div>
+        <input type="range" id="brilho" min="1" max="8" value="8" disabled aria-label="Brilho do visor">
+        <p class="dica">O menor que ainda dê para ler com a lente.</p>
       </div>
+
+      <div class="rotulo">Cena salva</div>
+      <div class="linha">
+        <select id="cena-sel" aria-label="Cenas salvas"></select>
+        <button id="cena-aplicar" class="secundario" title="Vira a cena padrão: aplica o brilho e liga o rodízio dela">Aplicar</button>
+      </div>
+      <div class="linha">
+        <input type="text" id="cena-nome" placeholder="nome" maxlength="40" aria-label="Nome da cena">
+        <button id="cena-salvar" title="Guarda brilho, letra, tamanho, espelhar e rodízio com esse nome">Salvar cena</button>
+        <button id="cena-apagar" class="secundario mini">Apagar</button>
+      </div>
+      <p class="dica">Guarda brilho, letra, tamanho, espelhar, rodízio e a regra abaixo.</p>
+
+      <div class="rotulo">Frase vinda de outro app</div>
+      <div class="frase-regra">
+        mostrar
+        <select id="api-modo" aria-label="Modo de escrita">
+          <option value="palavra">palavra por palavra</option>
+          <option value="inteira">de uma vez</option>
+        </select>
+        <span class="so-palavra"><input type="number" id="api-ppq" min="1" max="5" value="1" class="num"> por segundo,</span>
+        deixar <input type="number" id="api-seg" min="3" max="3600" value="90" class="num"> s
+        e voltar ao rodízio.
+      </div>
+    </section>
+
+    <!-- Automático -->
+    <section class="cartao" id="auto-cartao">
+      <h2>Automático <small>sem ninguém por perto</small></h2>
+      <label class="ao-vivo bloco"><input type="checkbox" id="auto-conectar"> Conectar sozinho ao ligar e quando o USB voltar</label>
+      <label class="ao-vivo bloco"><input type="checkbox" id="auto-expo"> Ligar o rodízio da cena padrão ao conectar</label>
+      <label class="ao-vivo bloco"><input type="checkbox" id="auto-bv"> Mostrar boas-vindas ao conectar</label>
+      <textarea id="bv-texto" rows="3" maxlength="200" aria-label="Texto das boas-vindas"></textarea>
+      <div class="linha">
+        <label class="ao-vivo">por <input type="number" id="bv-seg" min="1" max="600" value="8" class="num"> s</label>
+        <span class="dica" style="margin:0"><code>{hora}</code> vira a hora atual</span>
+      </div>
+      <label class="ao-vivo bloco" title="Boas-vindas, frase da API, envio manual ou teste: vencido o prazo, volta ao rodízio; sem rodízio, apaga"><input type="checkbox" id="guarda"> Nenhuma tela parada por mais de <input type="number" id="guarda-seg" min="10" max="3600" value="120" class="num"> s</label>
+      <p class="dica">Protege o fósforo. Testes de pontos têm prazo de <input type="number" id="teste-seg" min="5" max="300" value="30" class="num"> s.</p>
+      <div class="linha">
+        <button id="auto-salvar">Salvar automático</button>
+      </div>
+      <p class="dica agora">Agora na tela: <strong id="exibindo">nada</strong><br><span id="ultima-api"></span></p>
+    </section>
+
+    <!-- Outro app -->
+    <section class="cartao largo" id="api-cartao">
+      <h2>Outro app escrevendo na tela <small>API local</small></h2>
+      <ol class="passos">
+        <li><b>Onde</b>No mesmo computador:<br><code>POST /api/v1/texto</code></li>
+        <li><b>Mande</b>Só o texto. A cena cuida do resto.<br><code>{"texto": "…"}</code></li>
+        <li><b>Acontece</b>O rodízio pausa, a frase aparece e depois o rodízio volta.</li>
+        <li><b>Se a tela cair</b>Resposta <code>503</code>. Tente de novo; a reconexão é automática.</li>
+      </ol>
+      <div class="copiaveis">
+        <code id="api-url">http://127.0.0.1:8765/api/v1/texto</code>
+        <button class="secundario mini copiar" data-alvo="api-url">Copiar</button>
+        <code id="api-corpo">{"texto": "A dúvida é o começo da sabedoria."}</code>
+        <button class="secundario mini copiar" data-alvo="api-corpo">Copiar</button>
+      </div>
+      <div class="linha exemplo-topo">
+        <label class="ao-vivo">Exemplo em
+          <select id="api-ling" aria-label="Linguagem do exemplo">
+            <option value="curl">curl (Terminal)</option>
+            <option value="python">Python</option>
+            <option value="js">JavaScript</option>
+          </select>
+        </label>
+        <button id="api-copiar" class="secundario mini">Copiar exemplo</button>
+        <button id="api-testar" class="mini" disabled title="Manda uma frase de teste pela API, como o outro app faria">Testar agora</button>
+      </div>
+      <pre class="exemplo" id="api-exemplo"></pre>
+      <p class="dica">Opcional no JSON: <code>"cena"</code>, <code>"modo"</code> (<code>palavra</code> ou <code>inteira</code>), <code>"segundos"</code>. Guia completo, com Python e JavaScript: <a href="https://github.com/fradomnt/vfd-studio/blob/main/docs/API.md" target="_blank" rel="noopener">docs/API.md no repositório</a>.</p>
     </section>
 
     <!-- 8. Log -->

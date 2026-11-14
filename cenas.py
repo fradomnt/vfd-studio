@@ -41,6 +41,11 @@ CONFIG_PADRAO = {
     "boas_vindas": True,           # mostra a mensagem abaixo na tela ao conectar
     "boas_vindas_texto": "Tekne Studio\nVFD pronto · {hora}\naguardando frases",
     "boas_vindas_segundos": 8,     # depois disso entra o rodízio da cena (se auto_exposicao)
+    # Guarda-tela: nenhuma imagem parada (boas-vindas, frase da API, envio manual, teste) fica mais
+    # que isso. Vencido o prazo, volta ao rodízio da cena; sem rodízio, apaga a tela.
+    "guarda_tela": True,
+    "guarda_tela_segundos": 120,
+    "teste_segundos": 30,          # "Acender todos" e xadrez: prazo menor, é carga máxima
 }
 
 
