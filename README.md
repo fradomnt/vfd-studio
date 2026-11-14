@@ -13,6 +13,7 @@ Feita para a escultura *Devaneios do Aparato*: a tela fica dentro da peça, atr�
   frases prontas, prévia ponto a ponto antes de enviar, envio ao digitar.
 - **Exposição:** rodízio de frases, deslocamento de 1–2 pontos a cada minuto e brilho de 1 a 8,
   para a tela (que já tem desgaste) marcar menos.
+- **Logo:** botão que manda a assinatura frado para a tela.
 - **Teste de pontos:** todos acesos, xadrez, xadrez invertido, todos apagados.
 - Log dos envios ao vivo.
 

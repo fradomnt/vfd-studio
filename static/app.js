@@ -12,7 +12,7 @@ const el = {
   previaDica: $("previa-dica"), previaEstado: $("previa-estado"),
   preset: $("preset"), espH: $("esp-h"), espV: $("esp-v"),
   texto: $("texto"), textoInfo: $("texto-info"), peso: $("peso"),
-  textoEnviar: $("texto-enviar"), aoVivo: $("ao-vivo"),
+  textoEnviar: $("texto-enviar"), aoVivo: $("ao-vivo"), logoEnviar: $("logo-enviar"),
   tamAuto: $("tam-auto"), tam: $("tam"), tamValor: $("tam-valor"),
   brilho: $("brilho"), brilhoValor: $("brilho-valor"), expoInfo: $("expo-info"),
   expoLista: $("expo-lista"), expoVazia: $("expo-vazia"), expoAdd: $("expo-add"),
@@ -99,6 +99,7 @@ function atualizarBotoes() {
   el.desconectar.disabled = !conectado;
   el.iniciar.disabled = !conectado;
   el.textoEnviar.disabled = !conectado;
+  el.logoEnviar.disabled = !conectado;
   for (const b of el.testes) b.disabled = !conectado;
   el.brilho.disabled = !conectado;
   el.expoIniciar.disabled = !conectado || expo.ativa || !rodizio.length;
@@ -320,6 +321,7 @@ el.preset.addEventListener("change", () => {
   textoMudou();
 });
 el.textoEnviar.addEventListener("click", () => acao(el.textoEnviar, enviarTexto));
+el.logoEnviar.addEventListener("click", () => acao(el.logoEnviar, () => api("/api/desenho/enviar", { tipo: "logo" })));
 // Ctrl+Enter (ou Cmd+Enter) no texto = Enviar para a tela
 el.texto.addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey) && conectado) { ev.preventDefault(); enviarTexto(); }

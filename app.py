@@ -333,6 +333,11 @@ def _desenhar(pedido):
         img = presets.desenhar_padrao(pedido.padrao)
         descricao = f"Teste de pontos: {presets.PADROES[pedido.padrao]}."
         info = {}
+    elif pedido.tipo == "logo":
+        from PIL import Image
+        img = Image.open(PASTA / "assets" / "logo_vfd_256x128.png").convert("1")
+        descricao = "Logo frado enviada."
+        info = {}
     elif pedido.tipo == "texto":
         if len(pedido.texto) > 600:
             raise ValueError("Texto longo demais para a tela (máximo de 600 caracteres).")

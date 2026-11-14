@@ -4,10 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>VFD Studio</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header class="topo">
+    <img class="logo" src="/static/logo.png" alt="frado" width="60" height="69">
     <h1>VFD Studio</h1>
     <span class="modelo">Noritake GU256X128C-3900 · 256×128 · 38400 8N1</span>
     <span id="status" class="status desligado">desconectado</span>
@@ -66,6 +68,7 @@
       </div>
       <div class="linha">
         <button id="texto-enviar" disabled>Enviar para a tela</button>
+        <button id="logo-enviar" class="secundario" disabled title="Manda a assinatura frado para a tela">Enviar logo</button>
         <label class="ao-vivo" title="Manda para a tela sozinho, cerca de 1 s depois de você parar de digitar"><input type="checkbox" id="ao-vivo"> Enviar enquanto digito</label>
       </div>
       <p class="dica">Vai como imagem: os acentos aparecem e a letra ocupa a tela toda. Cada envio leva cerca de 1 s.</p>
