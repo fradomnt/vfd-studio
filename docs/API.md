@@ -235,3 +235,7 @@ Serve para saber que a frase terminou de aparecer (`exibindo` passa a `"api"` co
 
 Dúvidas e pedidos (fila em vez de cancelamento, outro comportamento ao terminar, mais eventos no
 WebSocket): abra uma issue no repositório ou fale com a equipe da escultura.
+
+---
+
+VFD Studio · desenvolvimento criativo: **Frado Monteiro** — [frado.com.br](https://frado.com.br) · Tekne Studio

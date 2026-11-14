@@ -1,5 +1,7 @@
 # VFD Studio
 
+**Desenvolvedor criativo:** Frado Monteiro · [frado.com.br](https://frado.com.br) · Tekne Studio
+
 Aplicação local para controlar a tela VFD gráfica **Noritake Itron GU256X128C-3900** (256×128 pontos)
 por um conversor USB-RS232. Roda em **Windows e macOS** com o mesmo código: um servidor Python sobe só
 no seu computador e abre a página em `http://127.0.0.1:8765`.
@@ -160,6 +162,13 @@ Cada sistema gera o seu, não dá para gerar o do Mac no Windows nem o contrári
 
 Os dois usam `vfd_studio.spec` (PyInstaller, listado em `requirements-dev.txt`). Para publicar nas
 Releases: `gh release upload v2.0 dist/VFD-Studio-2.0-mac.zip`.
+
+## Créditos
+
+- **Desenvolvimento criativo e direção:** Frado Monteiro — [frado.com.br](https://frado.com.br)
+- **Obra:** *Devaneios do Aparato*, Tekne Studio
+- **App de filosofias (IA) que alimenta a tela:** Marlus Araujo
+- Fonte Roboto Condensed (SIL Open Font License). Tela Noritake Itron GU256X128C-3900.
 
 ## Hardware (fixo)
 

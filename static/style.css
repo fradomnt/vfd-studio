@@ -200,5 +200,6 @@ code { font: 12px var(--f-mono); background: var(--c-log); padding: 1px 5px; bor
 }
 @media (max-width: 900px) { .passos { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .passos { grid-template-columns: 1fr; } .copiaveis { grid-template-columns: 1fr; } }
+.rodape { max-width: 1280px; margin: 0 auto; padding: 0 24px 32px; font: 12px var(--f-mono); color: var(--tinta-fraca); }
 a { color: var(--tinta); font-weight: 700; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 a:hover { color: var(--acento-escuro); }
