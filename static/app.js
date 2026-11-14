@@ -23,6 +23,8 @@ const el = {
   autoConectar: $("auto-conectar"), autoExpo: $("auto-expo"), autoBv: $("auto-bv"), bvTexto: $("bv-texto"),
   bvSeg: $("bv-seg"), autoSalvar: $("auto-salvar"), guarda: $("guarda"), guardaSeg: $("guarda-seg"), testeSeg: $("teste-seg"), exibindo: $("exibindo"), ultimaApi: $("ultima-api"),
   cenaInfo: $("cena-info"), apiExemplo: $("api-exemplo"), apiCopiar: $("api-copiar"), apiTestar: $("api-testar"),
+  dlgPeso: $("dlg-peso"), dlgTam: $("dlg-tam"), dstPeso: $("dst-peso"), dstTam: $("dst-tam"), dlgModo: $("dlg-modo"),
+  dlgCps: $("dlg-cps"), dlgSeg: $("dlg-seg"), dlgTestar: $("dlg-testar"),
   testes: [...document.querySelectorAll("button.teste")],
 };
 const MSG_SERVIDOR_PARADO =
@@ -98,7 +100,7 @@ function aplicarStatus(s) {
   if (s.config) mostrarConfig(s.config);
   if (s.versao) $("versao").textContent = s.versao;
   if (s.exibindo) {
-    const nomes = { nada: "nada", "boas-vindas": "boas-vindas", rodizio: "rodízio", api: "frase da API", quadro: "quadro de outro app", manual: "envio manual", teste: "teste de pontos" };
+    const nomes = { nada: "nada", "boas-vindas": "boas-vindas", rodizio: "rodízio", api: "frase da API", quadro: "quadro de outro app", dialogo: "diálogo da obra", manual: "envio manual", teste: "teste de pontos" };
     el.exibindo.textContent = nomes[s.exibindo] || s.exibindo;
   }
   if (s.ultima_api) el.ultimaApi.textContent = `Última da API às ${s.ultima_api.hora}: “${s.ultima_api.texto}”`;
@@ -113,6 +115,7 @@ function atualizarBotoes() {
   el.textoEnviar.disabled = !conectado;
   el.logoEnviar.disabled = !conectado;
   el.apiTestar.disabled = !conectado;
+  el.dlgTestar.disabled = !conectado;
   for (const b of el.testes) b.disabled = !conectado;
   el.brilho.disabled = !conectado;
   el.expoIniciar.disabled = !conectado || expo.ativa || !rodizio.length;
@@ -261,7 +264,14 @@ async function carregarCenas(selecionar) {
   el.cenaSel.value = selecionar || config.cena_padrao || el.cenaSel.value;
   el.cenaNome.value = el.cenaSel.value;
   const c = cenas[el.cenaSel.value];
-  if (c) { el.apiModo.value = c.api_modo; el.apiPpq.value = c.api_palavras_por_quadro; el.apiSeg.value = c.api_segundos; }
+  if (c) { el.apiModo.value = c.api_modo; el.apiPpq.value = c.api_palavras_por_quadro; el.apiSeg.value = c.api_segundos; dialogoParaPagina(c); }
+}
+
+// Os campos do diálogo da obra, da cena para a página.
+function dialogoParaPagina(c) {
+  el.dlgPeso.value = c.dialogo_peso; el.dlgTam.value = c.dialogo_tamanho;
+  el.dstPeso.value = c.destaque_peso; el.dstTam.value = c.destaque_tamanho;
+  el.dlgModo.value = c.dialogo_modo; el.dlgCps.value = c.dialogo_cps; el.dlgSeg.value = c.dialogo_segundos;
 }
 
 // A cena é montada a partir do que está na página agora.
@@ -272,6 +282,10 @@ function montarCena() {
     brilho: Number(el.brilho.value), segundos: Number(el.expoSeg.value) || 120, deslocar: el.expoDesloc.checked,
     rodizio: rodizio, api_modo: el.apiModo.value, api_palavras_por_quadro: Number(el.apiPpq.value) || 1,
     api_segundos: Number(el.apiSeg.value) || 90,
+    dialogo_modo: el.dlgModo.value, dialogo_cps: Number(el.dlgCps.value) || 22,
+    dialogo_peso: el.dlgPeso.value, dialogo_tamanho: Number(el.dlgTam.value) || 14,
+    destaque_peso: el.dstPeso.value, destaque_tamanho: Number(el.dstTam.value) || 20,
+    dialogo_segundos: Number(el.dlgSeg.value) || 180,
   };
 }
 
@@ -284,6 +298,7 @@ function cenaParaPagina(c) {
   el.brilho.value = c.brilho; el.brilhoValor.textContent = `${c.brilho} de 8`;
   el.expoSeg.value = c.segundos; el.expoDesloc.checked = c.deslocar;
   el.apiModo.value = c.api_modo; el.apiPpq.value = c.api_palavras_por_quadro; el.apiSeg.value = c.api_segundos;
+  dialogoParaPagina(c);
   rodizio = c.rodizio.map((f) => ({ ...f }));
   salvarRodizio(); mostrarExpo(); textoMudou();
 }
@@ -475,6 +490,10 @@ el.apiCopiar.addEventListener("click", () => acao(el.apiCopiar, async () => {
   await navigator.clipboard.writeText(el.apiExemplo.textContent);
   el.apiCopiar.textContent = "Copiado"; setTimeout(() => { el.apiCopiar.textContent = "Copiar exemplo"; }, 1500);
 }));
+el.dlgTestar.addEventListener("click", () => acao(el.dlgTestar, () => api("/api/v1/dialogo", {
+  fala: "A dúvida não é o contrário da certeza; é o que a certeza esconde quando se olha de perto demais.",
+  destaque: "O que resta é o espelho", origem: "página",
+})));
 el.apiTestar.addEventListener("click", () => acao(el.apiTestar, () => api("/api/v1/texto", {
   texto: "A dúvida é o começo da sabedoria.", origem: "teste da página", segundos: 20,
 })));

@@ -34,6 +34,7 @@ from PIL import Image
 from pydantic import BaseModel
 
 import cenas
+import dialogo as fluxo             # layout do diálogo da obra: fala em cima, destaque embaixo
 import presets
 import vfd as driver
 from caminhos import DADOS, EMPACOTADO, FIXOS, VERSAO
@@ -66,7 +67,7 @@ class Estado:
         # Prévia: os mesmos 4096 bytes do formato da tela (colunas, bit7 = ponto de cima).
         self.previa = bytes(driver.W * driver.H // 8)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="serial")
-        self.exibindo = "nada"              # nada | boas-vindas | rodizio | api | quadro | manual | teste
+        self.exibindo = "nada"              # nada | boas-vindas | rodizio | api | quadro | dialogo | manual | teste
         self.parado_desde = None            # quando a imagem atual (não rodízio) entrou na tela
         self.ultima_api = None              # resumo da última frase ou quadro recebido pela API
         # True quando a prévia reproduz o vidro byte a byte (desde o último 1B 40 + 0C). Só então o
@@ -139,7 +140,7 @@ def registrar(nivel, texto):
 def status_atual():
     return {"versao": VERSAO, "conectado": estado.conectado, "porta": estado.porta, "brilho": estado.brilho,
             "exposicao": expo.resumo(), "exibindo": estado.exibindo, "ultima_api": estado.ultima_api,
-            "config": cenas.config()}
+            "dialogo": resumo_dialogo(), "config": cenas.config()}
 
 
 def publicar_status():
@@ -409,6 +410,28 @@ class Quadro:
 quadro = Quadro()
 
 
+class Dialogo:
+    """O fluxo da obra (POST /api/v1/dialogo): uma fala por vez, com destaque opcional, escrita no ritmo
+    da cena. Uma fala nova cancela a anterior. `seq` numera as falas e `terminou` diz se a atual já foi
+    toda escrita: é o que o app que manda espera antes de mandar a próxima."""
+
+    def __init__(self):
+        self.lock = threading.Lock()        # uma escrita por vez
+        self.cancelar = threading.Event()
+        self.thread = None
+        self.seq = 0
+        self.terminou = True
+        self.volta_em = None                # quando o rodízio volta, se não chegar fala nova
+        self.passo = 0                      # índice em DESLOCAMENTOS: anda a cada fala
+
+
+dialogo = Dialogo()
+
+
+def resumo_dialogo():
+    return {"seq": dialogo.seq, "terminou": dialogo.terminou}
+
+
 def _escrever(texto, cena, nome_cena, modo, segundos, peso, tamanho, origem):
     """Thread: mostra o texto (inteiro ou palavra a palavra, em páginas) e agenda a volta do rodízio."""
     with escrita.lock:
@@ -470,8 +493,9 @@ def exibir_pela_api(texto, nome_cena=None, modo=None, segundos=None, peso=None, 
     paginas = presets.paginar(texto, peso, tamanho)
     lay = presets.layout_texto(paginas[0], peso, tamanho)
 
-    # cancela a frase anterior e a volta agendada; a nova é a que vale
+    # cancela a frase anterior, o diálogo e a volta agendada; a nova é a que vale
     escrita.cancelar.set()
+    dialogo.cancelar.set()
     if escrita.volta:
         escrita.volta.cancel()
     if escrita.thread and escrita.thread.is_alive() and escrita.thread is not threading.current_thread():
@@ -484,6 +508,90 @@ def exibir_pela_api(texto, nome_cena=None, modo=None, segundos=None, peso=None, 
                       f"modo {modo}, {len(paginas)} página(s).")
     return {"ok": True, "cena": nome, "modo": modo, "paginas": len(paginas), "letra": lay["tam"],
             "palavras": sum(len(p.split()) for p in paginas), "segundos": segundos}
+
+
+def _escrever_dialogo(fala, destaque, cena, nome_cena, origem, meu):
+    """Thread: escreve a fala (e o destaque) no ritmo da cena e marca o término.
+
+    Cada passo tem hora marcada (posição / cps a partir do início): se a serial atrasa, o laço só deixa
+    de dormir e segue no ritmo que o fio dá; se sobra tempo, dorme o que falta. Assim dialogo_cps é um
+    teto, e com bitmap_parcial desligado a escrita degrada sozinha para ~1 quadro por segundo."""
+    with dialogo.lock:
+        if dialogo.cancelar.is_set() or meu != dialogo.seq:
+            return
+        modo, cps = cena["dialogo_modo"], cena["dialogo_cps"]
+        try:
+            if estado.exibindo != "dialogo" or expo.ativa:
+                parar_exposicao()
+                escrita.cancelar.set()
+                if escrita.volta:
+                    escrita.volta.cancel()
+                registrar("info", f"API ({origem}): diálogo começou; rodízio pausado.")
+            if estado.brilho != cena["brilho"]:
+                aplicar_brilho(cena["brilho"])
+            lay = fluxo.layout(fala, destaque, cena)
+            etapas = fluxo.passos(lay, modo)
+            dx, dy = DESLOCAMENTOS[dialogo.passo % len(DESLOCAMENTOS)] if cena["deslocar"] else (0, 0)
+            t0 = time.time()
+            for rev_fala, rev_dest in etapas:
+                espera = t0 + (rev_fala + rev_dest) / cps - time.time()
+                if espera > 0 and dialogo.cancelar.wait(espera):
+                    return
+                if dialogo.cancelar.is_set():
+                    return
+                tela_img = Image.new("1", (driver.W, driver.H), 0)
+                tela_img.paste(fluxo.desenhar(lay, rev_fala, rev_dest), (dx, dy))
+                mostrar(presets.espelhar(tela_img, cena["espelhar_h"], cena["espelhar_v"]), "dialogo")
+            dialogo.terminou = True
+            dialogo.volta_em = time.time() + cena["dialogo_segundos"]
+            estado.ultima_api = {"texto": fala[:120], "destaque": destaque[:80], "cena": nome_cena,
+                                 "hora": time.strftime("%H:%M:%S"), "origem": origem}
+            publicar_status()
+            registrar("info", f"API ({origem}): fala #{meu} escrita em {time.time() - t0:.1f} s "
+                              f"({len(etapas)} quadros, modo {modo}); rodízio volta em "
+                              f"{cena['dialogo_segundos']} s sem fala nova.")
+        except Exception as e:
+            dialogo.terminou = True             # quem espera o término não pode ficar preso num erro
+            publicar_status()
+            registrar("erro", f"API: não consegui escrever a fala #{meu}. {e}")
+
+
+def exibir_dialogo(fala, destaque, nome_cena=None, origem="api"):
+    """Agenda a escrita de uma fala com destaque opcional. Devolve o resumo do que vai acontecer."""
+    if not estado.conectado:
+        raise RuntimeError(MSG_SEM_CONEXAO)
+    fala = " ".join((fala or "").split())
+    destaque = " ".join((destaque or "").split())
+    if not fala and not destaque:
+        raise ValueError("Fala e destaque vazios.")
+    if len(fala) > 2000:
+        raise ValueError("Fala longa demais (máximo de 2000 caracteres).")
+    if len(destaque) > 200:
+        raise ValueError("Destaque longo demais (máximo de 200 caracteres).")
+    nome, cena = cenas.obter(nome_cena or cenas.config()["cena_padrao"])
+    lay = fluxo.layout(fala, destaque, cena)    # valida a cena (fontes) antes de aceitar
+    etapas = fluxo.passos(lay, cena["dialogo_modo"])
+
+    # a fala nova é a que vale: cancela a anterior e espera a thread dela sair
+    dialogo.cancelar.set()
+    if dialogo.thread and dialogo.thread.is_alive() and dialogo.thread is not threading.current_thread():
+        dialogo.thread.join(timeout=5)
+    dialogo.cancelar.clear()
+    dialogo.seq += 1
+    meu = dialogo.seq
+    dialogo.terminou = False
+    dialogo.volta_em = None
+    dialogo.passo += 1
+    dialogo.thread = threading.Thread(target=_escrever_dialogo, args=(fala, destaque, cena, nome, origem, meu),
+                                      daemon=True, name="dialogo")
+    dialogo.thread.start()
+    publicar_status()
+    registrar("info", f"API ({origem}): fala #{meu} \"{fala[:60]}{'…' if len(fala) > 60 else ''}\""
+                      + (f" + destaque \"{destaque[:40]}\"" if destaque else "")
+                      + f" → cena \"{nome}\", modo {cena['dialogo_modo']}, {len(etapas)} quadros.")
+    previsto = (lay["n_fala"] + lay["n_dest"]) / cena["dialogo_cps"]
+    return {"ok": True, "seq": meu, "cena": nome, "modo": cena["dialogo_modo"], "quadros": len(etapas),
+            "segundos_previstos": round(previsto, 1), "segundos": cena["dialogo_segundos"]}
 
 
 # ================================================================ autonomia
@@ -581,6 +689,8 @@ def guarda_tela(cfg):
         return
     if escrita.thread and escrita.thread.is_alive() and estado.exibindo == "api":
         return                                  # frase da API ainda sendo escrita (quadros mudando)
+    if dialogo.thread and dialogo.thread.is_alive() and estado.exibindo == "dialogo":
+        return                                  # fala do diálogo ainda sendo escrita
     limite = cfg["teste_segundos"] if estado.exibindo == "teste" else cfg["guarda_tela_segundos"]
     if time.time() - estado.parado_desde < limite:
         return
@@ -603,6 +713,14 @@ def fim_dos_quadros():
     voltar_ao_rodizio("fim dos quadros da API")
 
 
+def fim_do_dialogo():
+    """Passou 'dialogo_segundos' da última fala sem chegar outra: o rodízio da cena volta."""
+    if estado.exibindo != "dialogo" or not dialogo.volta_em or time.time() < dialogo.volta_em:
+        return
+    dialogo.volta_em = None
+    voltar_ao_rodizio("fim do diálogo da API")
+
+
 def laco_autonomia():
     """A cada 3 s: se configurado e desconectado, tenta conectar. Se conectado, vigia se a porta sumiu,
     o prazo dos quadros da API e o guarda-tela."""
@@ -622,6 +740,7 @@ def laco_autonomia():
             elif cfg["auto_conectar"]:
                 conectar_sozinho()
             fim_dos_quadros()
+            fim_do_dialogo()
             guarda_tela(cfg)
         except Exception as e:
             registrar("erro", f"Vigia: {e}")
@@ -639,11 +758,14 @@ async def ciclo_de_vida(_app):
     registrar("info", "VFD Studio iniciado." + (" Procurando o conversor…" if cfg["auto_conectar"] else ""))
     yield
     escrita.cancelar.set()
+    dialogo.cancelar.set()
     expo.parar_ev.set()
     if expo.thread and expo.thread.is_alive():
         expo.thread.join(timeout=3)
     if escrita.thread and escrita.thread.is_alive():
         escrita.thread.join(timeout=3)
+    if dialogo.thread and dialogo.thread.is_alive():
+        dialogo.thread.join(timeout=3)
     apagar_ao_sair()
 
 
@@ -898,6 +1020,7 @@ async def aplicar_cena(nome: str):
         except Exception as e:
             return resposta_erro(e)
         escrita.cancelar.set()
+        dialogo.cancelar.set()
         if escrita.volta:
             escrita.volta.cancel()
         voltar_ao_rodizio(f"cena \"{nome}\" aplicada")
@@ -980,6 +1103,7 @@ async def api_v1_quadro(pedido: PedidoQuadroV1):
         if estado.exibindo != "quadro" or expo.ativa:
             parar_exposicao()
             escrita.cancelar.set()
+            dialogo.cancelar.set()
             if escrita.volta:
                 escrita.volta.cancel()
             registrar("info", f"API ({origem}): quadros prontos começaram a chegar; rodízio pausado.")
@@ -1005,10 +1129,27 @@ async def api_v1_quadro(pedido: PedidoQuadroV1):
             "cena": nome}
 
 
+class PedidoDialogoV1(BaseModel):
+    """O fluxo da obra: a fala do agente e, na convergência, o destaque. A cena decide a forma."""
+    fala: str = ""
+    destaque: str = ""
+    cena: str | None = None
+    origem: str = "api"
+
+
+@app.post("/api/v1/dialogo")
+def api_v1_dialogo(pedido: PedidoDialogoV1):
+    try:
+        return exibir_dialogo(pedido.fala, pedido.destaque, pedido.cena, pedido.origem[:30])
+    except Exception as e:
+        return resposta_erro(e, 503 if str(e) == MSG_SEM_CONEXAO else 400)
+
+
 @app.get("/api/v1/estado")
 def api_v1_estado():
     nome, cena = cena_atual()
     return {"ok": True, "conectado": estado.conectado, "porta": estado.porta, "exibindo": estado.exibindo,
+            "dialogo": resumo_dialogo(),
             "cena_padrao": nome, "cenas": sorted(cenas.todas()), "ultima": estado.ultima_api,
             "tela": {"largura": driver.W, "altura": driver.H}, "simulado": estado.porta == driver.PORTA_SIMULADA,
             "bitmap_parcial": cenas.config()["bitmap_parcial"]}
@@ -1019,6 +1160,7 @@ async def api_v1_limpar():
     """Apaga a tela e para tudo (rodízio e frase em exibição)."""
     parar_exposicao("API pediu para limpar")
     escrita.cancelar.set()
+    dialogo.cancelar.set()
     if escrita.volta:
         escrita.volta.cancel()
     try:

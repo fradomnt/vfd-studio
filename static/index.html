@@ -135,6 +135,39 @@
         deixar <input type="number" id="api-seg" min="3" max="3600" value="90" class="num"> s
         e voltar ao rodízio.
       </div>
+
+      <div class="rotulo">Diálogo da obra (aparatus)</div>
+      <div class="frase-regra">
+        fala em
+        <select id="dlg-peso" aria-label="Peso da fala">
+          <option value="light">letra bem fina</option>
+          <option value="regular" selected>letra fina</option>
+          <option value="medium">letra média</option>
+          <option value="bold">letra grossa</option>
+          <option value="black">letra bem grossa</option>
+        </select>
+        de <input type="number" id="dlg-tam" min="8" max="40" value="14" class="num"> pt,
+        destaque em
+        <select id="dst-peso" aria-label="Peso do destaque">
+          <option value="light">letra bem fina</option>
+          <option value="regular">letra fina</option>
+          <option value="medium">letra média</option>
+          <option value="bold" selected>letra grossa</option>
+          <option value="black">letra bem grossa</option>
+        </select>
+        de <input type="number" id="dst-tam" min="8" max="60" value="20" class="num"> pt,
+        aparecendo
+        <select id="dlg-modo" aria-label="Modo de revelação">
+          <option value="caractere">letra por letra</option>
+          <option value="palavra" selected>palavra por palavra</option>
+          <option value="linha">linha por linha</option>
+        </select>
+        a até <input type="number" id="dlg-cps" min="1" max="200" value="22" class="num"> letras/s;
+        sem fala nova por <input type="number" id="dlg-seg" min="3" max="3600" value="180" class="num"> s,
+        volta ao rodízio.
+        <button id="dlg-testar" class="secundario mini" disabled title="Manda uma fala e um destaque de exemplo por POST /api/v1/dialogo">Testar diálogo</button>
+      </div>
+      <p class="dica">Letra por letra só acompanha com o envio parcial ligado (bitmap_parcial no config.json); sem ele, a tela anda ~1 quadro por segundo.</p>
     </section>
 
     <!-- Automático -->

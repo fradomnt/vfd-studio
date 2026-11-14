@@ -86,6 +86,79 @@ Resposta `200`:
 
 A resposta volta **na hora**; a escrita acontece em seguida, em segundo plano.
 
+### `POST /api/v1/dialogo` — a fala da obra e o destaque
+
+O caminho do **Devaneios do Aparato**: o aparatus manda a fala do agente e, na convergência, o destaque;
+o VFD Studio escreve a fala na letra do fluxo e o destaque embaixo, na letra maior, sem apagar a fala.
+Letra, peso, tamanho, modo de revelação e cadência vêm da cena (seção 4): quem opera o vidro ajusta
+pela página, e o app que manda não muda.
+
+Corpo JSON. `fala` ou `destaque` precisa vir; os dois podem vir juntos.
+
+| Campo | Tipo | O que faz | Se omitir |
+|---|---|---|---|
+| `fala` | string | o que o agente disse. Até 2000 caracteres; espaços repetidos viram um | vazio |
+| `destaque` | string | a frase da convergência, escrita em maiúsculas embaixo da fala. Até 200 caracteres | vazio |
+| `cena` | string | nome de uma cena salva (seção 4) | cena padrão |
+| `origem` | string | nome do seu app, para o log e o estado | `"api"` |
+
+Resposta `200`, **na hora**; a escrita acontece em seguida, em segundo plano:
+
+```json
+{"ok": true, "seq": 12, "cena": "museu", "modo": "palavra", "quadros": 31, "segundos_previstos": 6.4, "segundos": 180}
+```
+
+| Campo | Significado |
+|---|---|
+| `seq` | número desta fala. É com ele que você sabe, no estado, se ela terminou |
+| `modo` | `caractere`, `palavra` ou `linha`: o que aparece de uma vez, pela cena |
+| `quadros` | quantas vezes a tela vai mudar até a fala estar inteira |
+| `segundos_previstos` | quanto a escrita leva no ritmo da cena, se a serial acompanhar |
+| `segundos` | sem fala nova por esse tempo, o rodízio volta |
+
+O que acontece:
+
+1. **Chegou a fala:** o rodízio pausa, uma frase de `/texto` ou um diálogo anterior em andamento é
+   cancelado (a mais recente é a que vale), o brilho da cena é aplicado.
+2. **A fala aparece** no modo da cena, a até `dialogo_cps` caracteres por segundo. O ritmo é um teto:
+   cada passo tem hora marcada, e se a serial atrasa o laço só deixa de dormir. Com `bitmap_parcial`
+   desligado cada quadro custa ~1,1 s, então `caractere` vira na prática um quadro por segundo;
+   `palavra` e `linha` cabem no fio de qualquer jeito.
+3. **O destaque** entra depois da fala inteira, embaixo dela, centralizado, no mesmo ritmo. O lugar dele
+   é reservado desde o início, então a fala não se desloca quando ele chega.
+4. **Fala longa** rola como um terminal: a janela termina na linha que está sendo escrita.
+5. **Terminou:** `GET /api/v1/estado` passa a trazer `"dialogo": {"seq": 12, "terminou": true}`, e o
+   mesmo objeto vai no `status` do WebSocket. Espere isso antes de mandar a próxima fala; se `seq` no
+   estado já for maior que o seu, a sua foi atropelada por outra e não vai terminar.
+6. **Depois de `segundos`** sem fala nova, o rodízio da cena volta. Enquanto a fala está sendo escrita
+   o guarda-tela não a interrompe.
+
+O bloco inteiro anda 1 a 2 pontos a cada fala (o mesmo deslocamento do rodízio), para o texto da obra
+não marcar sempre o mesmo lugar do fósforo.
+
+**Python**
+
+```python
+import requests, time
+
+VFD = "http://127.0.0.1:8765"
+
+def dizer(fala, destaque="", teto=60):
+    r = requests.post(f"{VFD}/api/v1/dialogo", json={"fala": fala, "destaque": destaque, "origem": "aparatus"},
+                      timeout=5).json()
+    if not r.get("ok"):
+        return r                                  # 400 ou 503: registre e siga
+    seq, fim = r["seq"], time.time() + teto
+    while time.time() < fim:                      # espera a tela terminar, com teto
+        d = requests.get(f"{VFD}/api/v1/estado", timeout=5).json()["dialogo"]
+        if d["seq"] > seq or (d["seq"] == seq and d["terminou"]):
+            break
+        time.sleep(0.5)
+    return r
+
+dizer("A dúvida não é o contrário da certeza.", destaque="O que resta é o espelho")
+```
+
 ### `GET /api/v1/estado` — como está a tela
 
 ```json
@@ -94,7 +167,8 @@ A resposta volta **na hora**; a escrita acontece em seguida, em segundo plano.
  "tela": {"largura": 256, "altura": 128}}
 ```
 
-`exibindo`: `boas-vindas`, `rodizio`, `api` (sua frase), `quadro` (seu bitmap), `manual`, `teste` ou
+`dialogo`: `{"seq": N, "terminou": bool}` da última fala de `/dialogo`.
+`exibindo`: `boas-vindas`, `rodizio`, `api` (sua frase), `dialogo` (a fala da obra), `quadro` (seu bitmap), `manual`, `teste` ou
 `nada` (apagada). `simulado` diz se é a tela simulada (seção 2). `bitmap_parcial` diz se o envio por
 região está ligado (seção 3b).
 
@@ -348,6 +422,7 @@ Serve para saber que a frase terminou de aparecer (`exibindo` passa a `"api"` co
 ## 11. Checklist de integração
 
 - [ ] Chamada `POST /api/v1/texto` com `texto` e `origem`, ou `POST /api/v1/quadro` com `png` e `origem`.
+- [ ] Diálogo da obra: `POST /api/v1/dialogo` com `fala`/`destaque`, e espera por `dialogo.terminou` no estado, com teto.
 - [ ] Quadros numa thread própria, com `timeout` de 10 s, aceitando `"exibido": false` sem reclamar.
 - [ ] `503` e conexão recusada tratados como "tente depois", sem travar.
 - [ ] Intervalo entre frases de pelo menos 1 minuto, ou `segundos` compatível com o tamanho.

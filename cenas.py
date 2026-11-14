@@ -31,6 +31,14 @@ CENA_PADRAO = {
     "api_modo": "palavra",         # "palavra" (vai escrevendo) ou "inteira"
     "api_palavras_por_quadro": 1,  # no modo palavra; cada quadro leva ~1 s na tela
     "api_segundos": 90,            # quanto tempo a frase fica depois de pronta, antes de voltar ao rodízio
+    # diálogo da obra (POST /api/v1/dialogo): a fala em letra pequena, o destaque embaixo em letra maior
+    "dialogo_modo": "palavra",     # "caractere" | "palavra" | "linha": o que aparece de uma vez
+    "dialogo_cps": 22,             # teto de caracteres por segundo; a serial decide o resto
+    "dialogo_peso": "regular",
+    "dialogo_tamanho": 14,         # pontos, fixo: o fluxo não muda de letra a cada fala
+    "destaque_peso": "bold",
+    "destaque_tamanho": 20,
+    "dialogo_segundos": 180,       # sem fala nova por esse tempo, o rodízio volta
 }
 
 CONFIG_PADRAO = {
@@ -79,6 +87,14 @@ def normalizar(cena):
     c["api_modo"] = c["api_modo"] if c["api_modo"] in ("palavra", "inteira") else "palavra"
     c["api_palavras_por_quadro"] = max(1, min(5, int(c["api_palavras_por_quadro"])))
     c["api_segundos"] = max(3, min(3600, int(c["api_segundos"])))
+    pesos = ("light", "regular", "medium", "bold", "black")
+    c["dialogo_modo"] = c["dialogo_modo"] if c["dialogo_modo"] in ("caractere", "palavra", "linha") else "palavra"
+    c["dialogo_cps"] = max(1, min(200, int(c["dialogo_cps"])))
+    c["dialogo_peso"] = c["dialogo_peso"] if c["dialogo_peso"] in pesos else "regular"
+    c["dialogo_tamanho"] = max(8, min(40, int(c["dialogo_tamanho"])))
+    c["destaque_peso"] = c["destaque_peso"] if c["destaque_peso"] in pesos else "bold"
+    c["destaque_tamanho"] = max(8, min(60, int(c["destaque_tamanho"])))
+    c["dialogo_segundos"] = max(3, min(3600, int(c["dialogo_segundos"])))
     c["rodizio"] = [{"texto": str(f.get("texto", ""))[:600], "peso": f.get("peso", c["peso"]),
                      "tamanho": int(f.get("tamanho", 0) or 0)}
                     for f in c.get("rodizio", []) if str(f.get("texto", "")).strip()][:30]
