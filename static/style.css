@@ -68,17 +68,19 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 15px/1.45
   background: var(--cartao); border: 2px solid var(--linha); border-radius: var(--raio);
   padding: 20px 22px; box-shadow: var(--sombra); min-width: 0;
 }
-#conexao { background: var(--c-conexao); }
-#teste-cartao { background: var(--c-teste); }
-#expo-cartao { background: var(--c-expo); }
-#log-cartao { background: var(--c-log); }
-/* dentro dos cartões coloridos, campos e botões claros continuam brancos para destacar */
-#conexao select, #expo-cartao #expo-seg, #expo-cartao .expo-lista li,
-#conexao button.secundario, #teste-cartao button.secundario, #expo-cartao button.secundario { background: var(--cartao); }
-#conexao .dica, #teste-cartao .dica, #expo-cartao .dica { color: #3A3A36; }
+/* Cartões brancos; a cor entra só em detalhes pequenos: um quadradinho antes do título de cada
+   cartão, os números do rodízio e os botões "Tirar". */
+.cartao h2::before {
+  content: ""; width: 12px; height: 12px; border-radius: 3px; border: 2px solid var(--linha);
+  background: var(--cartao); align-self: center; flex: none;
+}
+#conexao h2::before { background: var(--c-conexao); }
+#previa-cartao h2::before { background: var(--acento); }
+#teste-cartao h2::before { background: var(--c-teste); }
+#expo-cartao h2::before { background: var(--c-expo); }
+#log-cartao h2::before { background: var(--c-log); }
 .cartao h2 { margin: 0 0 14px; font: 800 17px var(--f-titulo); letter-spacing: -.02em; display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
 .cartao h2 small { font: 500 12px var(--f-mono); color: var(--tinta-fraca); }
-#conexao h2 small, #teste-cartao h2 small, #expo-cartao h2 small { color: #3A3A36; }
 
 /* -------------------------------------------------------------- controles */
 .linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
@@ -100,7 +102,7 @@ button {
 button:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--linha); }
 button:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--linha); }
 button.secundario { background: var(--cartao); color: var(--tinta); }
-button.secundario:hover:not(:disabled) { background: var(--acento) !important; }
+button.secundario:hover:not(:disabled) { background: var(--acento); }
 button:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; transform: none; }
 button.ocupado { cursor: progress; opacity: .7; }
 
@@ -141,13 +143,13 @@ button.ocupado { cursor: progress; opacity: .7; }
 }
 .expo-lista li::before {
   content: counter(frase); font: 800 12px var(--f-mono); min-width: 24px; height: 24px; border-radius: 999px;
-  display: inline-flex; align-items: center; justify-content: center; background: var(--tinta); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--c-expo); color: var(--tinta); border: 2px solid var(--linha);
 }
-.expo-lista li.atual { background: var(--acento); box-shadow: var(--sombra-p); }
+.expo-lista li.atual { border-color: var(--acento-escuro); box-shadow: 3px 3px 0 var(--acento-escuro); }
+.expo-lista li.atual::before { background: var(--acento); }
 .expo-lista .frase { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .expo-lista .meta { font: 11px var(--f-mono); color: var(--tinta-fraca); }
-.expo-lista li.atual .meta { color: var(--tinta); }
-.expo-lista button { padding: 4px 12px; font-size: 12px; box-shadow: none; background: var(--c-teste) !important; }
-.expo-lista button:hover:not(:disabled) { background: var(--alerta) !important; color: #fff; }
+.expo-lista button { padding: 4px 12px; font-size: 12px; box-shadow: none; background: var(--c-teste); }
+.expo-lista button:hover:not(:disabled) { background: var(--alerta); color: #fff; }
 #expo-seg { width: 78px; padding: 7px 10px; font: 600 14px var(--f-mono); }
 #expo-info.ativa { color: var(--acento-escuro); font-weight: 700; }
