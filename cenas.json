@@ -16,6 +16,14 @@
     ],
     "api_modo": "palavra",
     "api_palavras_por_quadro": 1,
-    "api_segundos": 90
+    "api_segundos": 90,
+    "dialogo_modo": "caractere",
+    "dialogo_cps": 30,
+    "dialogo_peso": "regular",
+    "dialogo_tamanho": 14,
+    "destaque_peso": "bold",
+    "destaque_tamanho": 0,
+    "destaque_pausa": 3,
+    "dialogo_segundos": 180
   }
 }

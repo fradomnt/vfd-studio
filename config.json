@@ -7,5 +7,6 @@
   "boas_vindas_segundos": 8,
   "guarda_tela": true,
   "guarda_tela_segundos": 120,
-  "teste_segundos": 30
+  "teste_segundos": 30,
+  "bitmap_parcial": true
 }
