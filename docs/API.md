@@ -89,7 +89,8 @@ A resposta volta **na hora**; a escrita acontece em seguida, em segundo plano.
 ### `POST /api/v1/dialogo` — a fala da obra e o destaque
 
 O caminho do **Devaneios do Aparato**: o aparatus manda a fala do agente e, na convergência, o destaque;
-o VFD Studio escreve a fala na letra do fluxo e o destaque embaixo, na letra maior, sem apagar a fala.
+o VFD Studio escreve a fala na letra do fluxo e, depois de uma pausa, limpa o vidro e escreve o destaque
+sozinho, em letra grande.
 Letra, peso, tamanho, modo de revelação e cadência vêm da cena (seção 4): quem opera o vidro ajusta
 pela página, e o app que manda não muda.
 
@@ -98,7 +99,7 @@ Corpo JSON. `fala` ou `destaque` precisa vir; os dois podem vir juntos.
 | Campo | Tipo | O que faz | Se omitir |
 |---|---|---|---|
 | `fala` | string | o que o agente disse. Até 2000 caracteres; espaços repetidos viram um | vazio |
-| `destaque` | string | a frase da convergência, escrita em maiúsculas embaixo da fala. Até 200 caracteres | vazio |
+| `destaque` | string | a frase da convergência: depois da fala e de uma pausa, o vidro limpa e ela entra sozinha, em maiúsculas e na maior letra que couber. Até 200 caracteres | vazio |
 | `cena` | string | nome de uma cena salva (seção 4) | cena padrão |
 | `origem` | string | nome do seu app, para o log e o estado | `"api"` |
 
@@ -124,8 +125,9 @@ O que acontece:
    cada passo tem hora marcada, e se a serial atrasa o laço só deixa de dormir. Com `bitmap_parcial`
    desligado cada quadro custa ~1,1 s, então `caractere` vira na prática um quadro por segundo;
    `palavra` e `linha` cabem no fio de qualquer jeito.
-3. **O destaque** entra depois da fala inteira, embaixo dela, centralizado, no mesmo ritmo. O lugar dele
-   é reservado desde o início, então a fala não se desloca quando ele chega.
+3. **O destaque** nunca divide o vidro com a fala: a fala fica parada, inteira, por `destaque_pausa`
+   segundos; então o vidro limpa e o destaque entra sozinho, centralizado, na maior letra que couber
+   (`destaque_tamanho` = 0) ou no tamanho da cena, no mesmo modo de revelação.
 4. **Fala longa** rola como um terminal: a janela termina na linha que está sendo escrita.
 5. **Terminou:** `GET /api/v1/estado` passa a trazer `"dialogo": {"seq": 12, "terminou": true, "fase": "fim"}`,
    e o mesmo objeto vai no `status` do WebSocket. Espere isso antes de mandar a próxima fala; se `seq`

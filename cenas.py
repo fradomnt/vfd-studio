@@ -37,7 +37,8 @@ CENA_PADRAO = {
     "dialogo_peso": "regular",
     "dialogo_tamanho": 14,         # pontos, fixo: o fluxo não muda de letra a cada fala
     "destaque_peso": "bold",
-    "destaque_tamanho": 20,
+    "destaque_tamanho": 0,         # 0 = a maior letra que couber; o destaque tem a tela só para ele
+    "destaque_pausa": 3,           # segundos com a fala parada antes de a tela limpar para o destaque
     "dialogo_segundos": 180,       # sem fala nova por esse tempo, o rodízio volta
 }
 
@@ -93,7 +94,8 @@ def normalizar(cena):
     c["dialogo_peso"] = c["dialogo_peso"] if c["dialogo_peso"] in pesos else "regular"
     c["dialogo_tamanho"] = max(8, min(40, int(c["dialogo_tamanho"])))
     c["destaque_peso"] = c["destaque_peso"] if c["destaque_peso"] in pesos else "bold"
-    c["destaque_tamanho"] = max(8, min(60, int(c["destaque_tamanho"])))
+    c["destaque_tamanho"] = max(0, min(120, int(c["destaque_tamanho"] or 0)))
+    c["destaque_pausa"] = max(0, min(60, int(c["destaque_pausa"])))
     c["dialogo_segundos"] = max(3, min(3600, int(c["dialogo_segundos"])))
     c["rodizio"] = [{"texto": str(f.get("texto", ""))[:600], "peso": f.get("peso", c["peso"]),
                      "tamanho": int(f.get("tamanho", 0) or 0)}

@@ -537,14 +537,20 @@ def _escrever_dialogo(fala, destaque, cena, nome_cena, origem, meu):
             dx, dy = DESLOCAMENTOS[dialogo.passo % len(DESLOCAMENTOS)] if cena["deslocar"] else (0, 0)
             t0 = time.time()
             for rev_fala, rev_dest in etapas:
+                if rev_dest > 0 and dialogo.fase != "destaque":
+                    # A fala fica parada, inteira, o tempo de ler; só então o
+                    # vidro limpa e o destaque entra sozinho. A pausa não conta
+                    # na cadência: o relógio dos passos recomeça depois dela.
+                    if dialogo.cancelar.wait(cena["destaque_pausa"]):
+                        return
+                    t0 = time.time() - rev_fala / cps
+                    dialogo.fase = "destaque"
+                    publicar_status()
                 espera = t0 + (rev_fala + rev_dest) / cps - time.time()
                 if espera > 0 and dialogo.cancelar.wait(espera):
                     return
                 if dialogo.cancelar.is_set():
                     return
-                if rev_dest > 0 and dialogo.fase != "destaque":
-                    dialogo.fase = "destaque"
-                    publicar_status()
                 tela_img = Image.new("1", (driver.W, driver.H), 0)
                 tela_img.paste(fluxo.desenhar(lay, rev_fala, rev_dest), (dx, dy))
                 mostrar(presets.espelhar(tela_img, cena["espelhar_h"], cena["espelhar_v"]), "dialogo")
@@ -598,7 +604,7 @@ def exibir_dialogo(fala, destaque, nome_cena=None, origem="api"):
     registrar("info", f"API ({origem}): fala #{meu} \"{fala[:60]}{'…' if len(fala) > 60 else ''}\""
                       + (f" + destaque \"{destaque[:40]}\"" if destaque else "")
                       + f" → cena \"{nome}\", modo {cena['dialogo_modo']}, {len(etapas)} quadros.")
-    previsto = (lay["n_fala"] + lay["n_dest"]) / cena["dialogo_cps"]
+    previsto = (lay["n_fala"] + lay["n_dest"]) / cena["dialogo_cps"] + (cena["destaque_pausa"] if destaque else 0)
     return {"ok": True, "seq": meu, "cena": nome, "modo": cena["dialogo_modo"], "quadros": len(etapas),
             "segundos_previstos": round(previsto, 1), "segundos": cena["dialogo_segundos"]}
 

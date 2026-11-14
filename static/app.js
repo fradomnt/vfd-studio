@@ -24,7 +24,7 @@ const el = {
   bvSeg: $("bv-seg"), autoSalvar: $("auto-salvar"), guarda: $("guarda"), guardaSeg: $("guarda-seg"), testeSeg: $("teste-seg"), exibindo: $("exibindo"), ultimaApi: $("ultima-api"),
   cenaInfo: $("cena-info"), apiExemplo: $("api-exemplo"), apiCopiar: $("api-copiar"), apiTestar: $("api-testar"),
   dlgPeso: $("dlg-peso"), dlgTam: $("dlg-tam"), dstPeso: $("dst-peso"), dstTam: $("dst-tam"), dlgModo: $("dlg-modo"),
-  dlgCps: $("dlg-cps"), dlgSeg: $("dlg-seg"), dlgTestar: $("dlg-testar"),
+  dlgCps: $("dlg-cps"), dlgSeg: $("dlg-seg"), dstPausa: $("dst-pausa"), dlgTestar: $("dlg-testar"),
   testes: [...document.querySelectorAll("button.teste")],
 };
 const MSG_SERVIDOR_PARADO =
@@ -270,7 +270,7 @@ async function carregarCenas(selecionar) {
 // Os campos do diálogo da obra, da cena para a página.
 function dialogoParaPagina(c) {
   el.dlgPeso.value = c.dialogo_peso; el.dlgTam.value = c.dialogo_tamanho;
-  el.dstPeso.value = c.destaque_peso; el.dstTam.value = c.destaque_tamanho;
+  el.dstPeso.value = c.destaque_peso; el.dstTam.value = c.destaque_tamanho; el.dstPausa.value = c.destaque_pausa;
   el.dlgModo.value = c.dialogo_modo; el.dlgCps.value = c.dialogo_cps; el.dlgSeg.value = c.dialogo_segundos;
 }
 
@@ -284,7 +284,8 @@ function montarCena() {
     api_segundos: Number(el.apiSeg.value) || 90,
     dialogo_modo: el.dlgModo.value, dialogo_cps: Number(el.dlgCps.value) || 22,
     dialogo_peso: el.dlgPeso.value, dialogo_tamanho: Number(el.dlgTam.value) || 14,
-    destaque_peso: el.dstPeso.value, destaque_tamanho: Number(el.dstTam.value) || 20,
+    destaque_peso: el.dstPeso.value, destaque_tamanho: Number(el.dstTam.value) || 0,
+    destaque_pausa: Number(el.dstPausa.value) || 0,
     dialogo_segundos: Number(el.dlgSeg.value) || 180,
   };
 }
