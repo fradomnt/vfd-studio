@@ -1,0 +1,8 @@
+{
+  "auto_conectar": true,
+  "auto_exposicao": true,
+  "cena_padrao": "museu",
+  "boas_vindas": true,
+  "boas_vindas_texto": "Tekne Studio\nVFD pronto · {hora}\naguardando frases",
+  "boas_vindas_segundos": 8
+}

@@ -8,6 +8,9 @@ Regras de arquitetura:
 - O servidor só escuta em 127.0.0.1 e recusa qualquer Host/Origin que não seja local.
 - Este processo é o ÚNICO dono da porta serial: um objeto VFD por vez, protegido por um lock.
 - Todo envio à serial roda num executor de 1 thread, com timeout, para o servidor nunca travar.
+- Autonomia (museu): procura o conversor sozinho, mostra boas-vindas, liga o rodízio da cena padrão,
+  reconecta se o USB sair. Frases que chegam pela API v1 interrompem o rodízio e, passado o tempo da
+  cena, o rodízio volta sozinho. A tela nunca fica vazia por falta de quem mande.
 """
 import asyncio
 import base64
@@ -23,8 +26,10 @@ import serial
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from PIL import Image
 from pydantic import BaseModel
 
+import cenas
 import presets
 import vfd as driver
 
@@ -40,6 +45,7 @@ MSG_SUMIU = "Porta não encontrada. O USB pode ter saído. Plugue o conversor e 
 MSG_TIMEOUT = ("A tela não recebeu os dados a tempo. Confira se a fonte de 5 V está ligada e se o USB "
                "está firme, depois tente de novo.")
 MSG_SEM_CONEXAO = "Sem conexão. Escolha a porta e clique em Conectar."
+MSG_SEM_CONVERSOR = "Nenhum conversor FTDI encontrado nas portas USB. Plugue o PCM-KW-469."
 
 
 # ======================================================================= estado
@@ -55,6 +61,8 @@ class Estado:
         # Prévia: os mesmos 4096 bytes do formato da tela (colunas, bit7 = ponto de cima).
         self.previa = bytes(driver.W * driver.H // 8)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="serial")
+        self.exibindo = "nada"              # nada | boas-vindas | rodizio | api | manual
+        self.ultima_api = None              # resumo da última frase recebida pela API
 
     @property
     def conectado(self):
@@ -72,6 +80,7 @@ class Exposicao:
         self.parar_ev = threading.Event()
         self.ativa = False
         self.frase, self.total = 0, 0
+        self.pedido = None                  # último pedido, para o rodízio poder voltar sozinho
 
     def resumo(self):
         return {"ativa": self.ativa, "frase": self.frase, "total": self.total}
@@ -120,7 +129,8 @@ def registrar(nivel, texto):
 
 def status_atual():
     return {"conectado": estado.conectado, "porta": estado.porta, "brilho": estado.brilho,
-            "exposicao": expo.resumo()}
+            "exposicao": expo.resumo(), "exibindo": estado.exibindo, "ultima_api": estado.ultima_api,
+            "config": cenas.config()}
 
 
 def publicar_status():
@@ -134,6 +144,14 @@ def publicar_previa():
 def ao_enviar(n, segundos):
     """Gancho chamado pelo driver depois de cada envio."""
     registrar("tx", f"{n} B enviados em {segundos*1000:.0f} ms")
+
+
+def mostrar(img, origem):
+    """Manda uma imagem para a tela (na thread de quem chama, com lock) e atualiza a prévia."""
+    com_tela(lambda t: t.bitmap(img))
+    estado.previa = driver.VFD._codificar(img)
+    estado.exibindo = origem
+    publicar_previa()
 
 
 # ============================================================ serial (thread)
@@ -155,16 +173,32 @@ def mensagem_erro(e):
 def _fechar_tela(motivo=None):
     """Fecha a porta e volta ao estado desconectado. Chamar com o lock já tomado ou sem tela em uso."""
     expo.parar_ev.set()                     # sem tela, a exposição para sozinha
+    escrita.cancelar.set()
     if estado.tela is not None:
         estado.tela.fechar()
     estado.tela = None
+    estado.exibindo = "nada"
     if motivo:
         registrar("erro", motivo)
     publicar_status()
 
 
+def _abrir_porta(porta):
+    """Abre a porta (sem mandar nada à tela). Chamar com o lock tomado. Levanta RuntimeError claro."""
+    if estado.tela is not None:
+        if estado.porta == porta:
+            return
+        estado.tela.fechar()
+        estado.tela = None
+    try:
+        estado.tela = driver.VFD(porta, iniciar=False, ao_enviar=ao_enviar)
+    except (serial.SerialException, OSError, ValueError) as e:
+        raise RuntimeError(mensagem_erro(e)) from e
+    estado.porta = porta
+
+
 def com_tela(funcao):
-    """Executa funcao(tela) na thread da serial, com lock. Erro de E/S = conversor perdido."""
+    """Executa funcao(tela) com lock. Erro de E/S = conversor perdido."""
     with estado.lock:
         if estado.tela is None:
             raise RuntimeError(MSG_SEM_CONEXAO)
@@ -192,33 +226,303 @@ def resposta_erro(e, codigo=400):
     return JSONResponse({"ok": False, "erro": msg}, status_code=codigo)
 
 
-# ======================================================== vigia do conversor
-def vigia():
-    """A cada 2 s confere se a porta conectada ainda existe (conversor desplugado)."""
-    while True:
-        time.sleep(2)
-        porta = estado.porta
-        if not estado.conectado or not porta:
-            continue
+# =========================================================== cena em uso
+def cena_atual():
+    """(nome, cena) da cena padrão da configuração."""
+    return cenas.obter(cenas.config()["cena_padrao"])
+
+
+def imagens_do_rodizio(cena):
+    imgs = []
+    for f in cena["rodizio"]:
+        img, _, _, _ = presets.desenhar_texto(f["texto"][:600], f.get("peso", cena["peso"]), f.get("tamanho", 0))
+        imgs.append(presets.espelhar(img, cena["espelhar_h"], cena["espelhar_v"]))
+    return imgs
+
+
+def aplicar_brilho(nivel):
+    nivel = max(1, min(8, int(nivel)))
+    com_tela(lambda t: t.brilho(nivel))
+    estado.brilho = nivel
+    publicar_status()
+
+
+# ====================================================================== rodízio
+# Caminho do deslocamento: no máximo 2 pontos para cada lado. Cabe na margem de 3 pontos do texto.
+DESLOCAMENTOS = [(0, 0), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1),
+                 (2, 0), (0, 2), (-2, 0), (0, -2)]
+SEGUNDOS_DESLOCAR = 60
+
+
+class FraseExpo(BaseModel):
+    texto: str
+    peso: str = "medium"
+    tamanho: int = 0
+
+
+class PedidoExposicao(BaseModel):
+    frases: list[FraseExpo]
+    segundos: int = 120            # tempo de cada frase na tela
+    deslocar: bool = True
+    espelhar_h: bool = False
+    espelhar_v: bool = False
+
+
+def parar_exposicao(motivo=None):
+    """Para o rodízio, se estiver ligado, e espera a thread sair."""
+    if not expo.ativa:
+        return
+    expo.parar_ev.set()
+    if expo.thread and expo.thread is not threading.current_thread():
+        expo.thread.join(timeout=5)
+    if motivo:
+        registrar("info", f"Exposição parada: {motivo}.")
+
+
+def _laco_exposicao(pedido, imagens):
+    """Thread do rodízio. imagens = uma PIL Image por frase, já desenhada e espelhada."""
+    i, passo = 0, 0
+    troca_em = time.time() + pedido.segundos
+    try:
+        while not expo.parar_ev.is_set():
+            dx, dy = DESLOCAMENTOS[passo % len(DESLOCAMENTOS)] if pedido.deslocar else (0, 0)
+            quadro = Image.new("1", (driver.W, driver.H), 0)
+            quadro.paste(imagens[i], (dx, dy))
+            mostrar(quadro, "rodizio")
+            expo.frase = i + 1
+            publicar_status()
+            falta = max(0.5, troca_em - time.time())
+            espera = min(falta, SEGUNDOS_DESLOCAR) if pedido.deslocar else falta
+            if expo.parar_ev.wait(espera):
+                break
+            passo += 1
+            if time.time() >= troca_em:
+                i = (i + 1) % len(imagens)
+                troca_em = time.time() + pedido.segundos
+    except Exception as e:
+        registrar("erro", f"Exposição interrompida. {e}")
+    finally:
+        expo.ativa = False
+        expo.frase = 0
+        publicar_status()
+
+
+def comecar_exposicao(pedido, imagens, origem="pela página"):
+    """Liga o rodízio (pode ser chamado de qualquer thread)."""
+    parar_exposicao()
+    expo.parar_ev.clear()
+    expo.pedido = (pedido, imagens)
+    expo.ativa, expo.frase, expo.total = True, 0, len(imagens)
+    expo.thread = threading.Thread(target=_laco_exposicao, args=(pedido, imagens),
+                                   daemon=True, name="exposicao")
+    expo.thread.start()
+    registrar("info", f"Exposição ligada {origem}: {len(imagens)} frase(s), {pedido.segundos} s cada"
+                      f"{', com deslocamento' if pedido.deslocar else ''}.")
+
+
+def exposicao_da_cena(nome, cena):
+    """Monta o pedido de rodízio a partir de uma cena. None se a cena não tem frases."""
+    if not cena["rodizio"]:
+        return None, None
+    pedido = PedidoExposicao(frases=[FraseExpo(**f) for f in cena["rodizio"]], segundos=cena["segundos"],
+                             deslocar=cena["deslocar"], espelhar_h=cena["espelhar_h"],
+                             espelhar_v=cena["espelhar_v"])
+    return pedido, imagens_do_rodizio(cena)
+
+
+def voltar_ao_rodizio(motivo):
+    """Depois de uma frase da API ou das boas-vindas: religa o rodízio da cena padrão, se configurado."""
+    cfg = cenas.config()
+    if not estado.conectado or not cfg["auto_exposicao"]:
+        return
+    nome, cena = cena_atual()
+    pedido, imagens = exposicao_da_cena(nome, cena)
+    if pedido is None:
+        registrar("info", f"Cena \"{nome}\" não tem rodízio; a tela fica com o último conteúdo.")
+        return
+    comecar_exposicao(pedido, imagens, f"({motivo}, cena \"{nome}\")")
+
+
+# ============================================================ escrita pela API
+class Escrita:
+    """Uma frase vinda da API por vez. Uma nova cancela a anterior (a mais recente é a que vale)."""
+
+    def __init__(self):
+        self.lock = threading.Lock()        # garante uma escrita por vez
+        self.cancelar = threading.Event()
+        self.thread = None
+        self.volta = None                   # Timer que religa o rodízio
+
+
+escrita = Escrita()
+
+
+def _escrever(texto, cena, nome_cena, modo, segundos, peso, tamanho, origem):
+    """Thread: mostra o texto (inteiro ou palavra a palavra, em páginas) e agenda a volta do rodízio."""
+    with escrita.lock:
+        if escrita.cancelar.is_set():
+            return
         try:
-            existentes = {p["porta"] for p in driver.portas()}
-        except Exception:
-            continue
-        if porta not in existentes:
-            with estado.lock:
-                if estado.conectado and estado.porta == porta:
-                    _fechar_tela(f"Conversor desconectado: a {porta} sumiu. "
-                                 f"Plugue o USB e clique em Conectar.")
+            parar_exposicao()
+            paginas = presets.paginar(texto, peso, tamanho)
+            por_quadro = cena["api_palavras_por_quadro"]
+            for n_pag, pagina in enumerate(paginas, 1):
+                lay = presets.layout_texto(pagina, peso, tamanho)
+                total = lay["palavras"]
+                if modo == "palavra":
+                    vistas = 0
+                    while vistas < total:
+                        if escrita.cancelar.is_set():
+                            return
+                        vistas = min(total, vistas + por_quadro)
+                        mostrar(presets.espelhar(presets.desenhar_layout(lay, vistas),
+                                                 cena["espelhar_h"], cena["espelhar_v"]), "api")
+                else:
+                    mostrar(presets.espelhar(presets.desenhar_layout(lay), cena["espelhar_h"],
+                                             cena["espelhar_v"]), "api")
+                ultima = n_pag == len(paginas)
+                # tempo de leitura da página: ~0,4 s por palavra, mínimo 3 s; a última fica 'segundos'
+                espera = segundos if ultima else max(3.0, 1.5 + 0.4 * total)
+                if ultima:
+                    break
+                if escrita.cancelar.wait(espera):
+                    return
+            estado.ultima_api = {"texto": texto[:120], "cena": nome_cena, "paginas": len(paginas),
+                                 "letra": lay["tam"], "hora": time.strftime("%H:%M:%S"), "origem": origem}
+            publicar_status()
+            registrar("info", f"API: frase exibida ({len(paginas)} página(s), letra {lay['tam']} pt, "
+                              f"modo {modo}); rodízio volta em {segundos} s.")
+            escrita.volta = threading.Timer(segundos, voltar_ao_rodizio, args=("fim da frase da API",))
+            escrita.volta.daemon = True
+            escrita.volta.start()
+        except Exception as e:
+            registrar("erro", f"API: não consegui exibir a frase. {e}")
+
+
+def exibir_pela_api(texto, nome_cena=None, modo=None, segundos=None, peso=None, tamanho=None, origem="api"):
+    """Agenda a exibição de uma frase. Devolve o resumo do que vai acontecer."""
+    if not estado.conectado:
+        raise RuntimeError(MSG_SEM_CONEXAO)
+    texto = (texto or "").strip()
+    if not texto:
+        raise ValueError("Texto vazio.")
+    if len(texto) > 2000:
+        raise ValueError("Texto longo demais (máximo de 2000 caracteres).")
+    nome, cena = cenas.obter(nome_cena or cenas.config()["cena_padrao"])
+    modo = modo if modo in ("palavra", "inteira") else cena["api_modo"]
+    segundos = max(3, min(3600, int(segundos))) if segundos else cena["api_segundos"]
+    peso = peso if peso in presets.PESOS else cena["peso"]
+    tamanho = int(tamanho) if tamanho is not None else cena["tamanho"]
+    paginas = presets.paginar(texto, peso, tamanho)
+    lay = presets.layout_texto(paginas[0], peso, tamanho)
+
+    # cancela a frase anterior e a volta agendada; a nova é a que vale
+    escrita.cancelar.set()
+    if escrita.volta:
+        escrita.volta.cancel()
+    if escrita.thread and escrita.thread.is_alive() and escrita.thread is not threading.current_thread():
+        escrita.thread.join(timeout=5)
+    escrita.cancelar.clear()
+    escrita.thread = threading.Thread(target=_escrever, args=(texto, cena, nome, modo, segundos, peso,
+                                                              tamanho, origem), daemon=True, name="escrita")
+    escrita.thread.start()
+    registrar("info", f"API ({origem}): \"{texto[:60]}{'…' if len(texto) > 60 else ''}\" → cena \"{nome}\", "
+                      f"modo {modo}, {len(paginas)} página(s).")
+    return {"ok": True, "cena": nome, "modo": modo, "paginas": len(paginas), "letra": lay["tam"],
+            "palavras": sum(len(p.split()) for p in paginas), "segundos": segundos}
+
+
+# ================================================================ autonomia
+class Autonomia:
+    def __init__(self):
+        self.ultimo_erro = None             # para não repetir o mesmo aviso a cada 3 s
+        self.tentativas = 0
+
+
+auto = Autonomia()
+
+
+def boas_vindas():
+    cfg = cenas.config()
+    if not cfg["boas_vindas"]:
+        return
+    texto = cfg["boas_vindas_texto"].replace("{hora}", time.strftime("%H:%M"))
+    img, _, _, _ = presets.desenhar_texto(texto, "medium", 0)
+    _, cena = cena_atual()
+    mostrar(presets.espelhar(img, cena["espelhar_h"], cena["espelhar_v"]), "boas-vindas")
+
+
+def conectar_sozinho():
+    """Procura o conversor, conecta, inicializa, aplica o brilho da cena e mostra as boas-vindas.
+    Roda na thread da autonomia. Devolve True se conectou."""
+    porta = driver.porta_preferida()
+    if not porta:
+        if auto.ultimo_erro != MSG_SEM_CONVERSOR:
+            registrar("erro", MSG_SEM_CONVERSOR + " Vou tentar de novo a cada 3 s.")
+            auto.ultimo_erro = MSG_SEM_CONVERSOR
+        return False
+    try:
+        with estado.lock:
+            _abrir_porta(porta)
+    except RuntimeError as e:
+        if auto.ultimo_erro != str(e):
+            registrar("erro", f"Conexão automática em {porta} falhou. {e} Vou tentar de novo a cada 3 s.")
+            auto.ultimo_erro = str(e)
+        return False
+    auto.ultimo_erro = None
+    registrar("info", f"Conectado sozinho em {porta} @ 38400 8N1.")
+    publicar_status()
+    try:
+        com_tela(lambda t: t.iniciar())
+        nome, cena = cena_atual()
+        aplicar_brilho(cena["brilho"])
+        boas_vindas()
+        cfg = cenas.config()
+        registrar("info", f"Tela inicializada; brilho {cena['brilho']} de 8 (cena \"{nome}\").")
+        if cfg["auto_exposicao"]:
+            t = threading.Timer(cfg["boas_vindas_segundos"] if cfg["boas_vindas"] else 0.5,
+                                voltar_ao_rodizio, args=("início automático",))
+            t.daemon = True
+            t.start()
+    except Exception as e:
+        registrar("erro", f"Conectei, mas a tela não respondeu bem: {e}")
+    return True
+
+
+def laco_autonomia():
+    """A cada 3 s: se configurado e desconectado, tenta conectar. Se conectado, vigia se a porta sumiu."""
+    time.sleep(1.5)
+    while True:
+        try:
+            cfg = cenas.config()
+            if estado.conectado:
+                porta = estado.porta
+                existentes = {p["porta"] for p in driver.portas()}
+                if porta and porta not in existentes:
+                    with estado.lock:
+                        if estado.conectado and estado.porta == porta:
+                            _fechar_tela(f"Conversor desconectado: a {porta} sumiu. "
+                                         + ("Vou reconectar sozinho quando voltar." if cfg["auto_conectar"]
+                                            else "Plugue o USB e clique em Conectar."))
+            elif cfg["auto_conectar"]:
+                conectar_sozinho()
+        except Exception as e:
+            registrar("erro", f"Vigia: {e}")
+        time.sleep(3)
 
 
 # ===================================================================== app
 @contextlib.asynccontextmanager
 async def ciclo_de_vida(_app):
-    """Início: guarda o loop para o hub e liga o vigia. Fim: fecha a porta serial."""
+    """Início: guarda o loop para o hub e liga a autonomia. Fim: fecha a porta serial."""
     hub.loop = asyncio.get_running_loop()
-    threading.Thread(target=vigia, daemon=True, name="vigia").start()
-    registrar("info", "VFD Studio iniciado.")
+    cenas.garantir_arquivos()
+    threading.Thread(target=laco_autonomia, daemon=True, name="autonomia").start()
+    cfg = cenas.config()
+    registrar("info", "VFD Studio iniciado." + (" Procurando o conversor…" if cfg["auto_conectar"] else ""))
     yield
+    escrita.cancelar.set()
+    expo.parar_ev.set()
     with estado.lock:
         if estado.tela is not None:
             estado.tela.fechar()
@@ -266,22 +570,13 @@ def ler_estado():
 async def conectar(pedido: PedidoConectar):
     def abrir():
         with estado.lock:
-            if estado.tela is not None:
-                if estado.porta == pedido.porta:
-                    return
-                estado.tela.fechar()
-                estado.tela = None
-            try:
-                # Abre sem inicializar: o botão "Inicializar tela" faz isso.
-                estado.tela = driver.VFD(pedido.porta, iniciar=False, ao_enviar=ao_enviar)
-            except (serial.SerialException, OSError, ValueError) as e:
-                raise RuntimeError(mensagem_erro(e)) from e
-            estado.porta = pedido.porta
+            _abrir_porta(pedido.porta)
     try:
         await na_serial(abrir)
     except Exception as e:
         publicar_status()
         return resposta_erro(e)
+    auto.ultimo_erro = None
     registrar("info", f"Conectado em {pedido.porta} @ 38400 8N1.")
     publicar_status()
     return {"ok": True, **status_atual()}
@@ -296,7 +591,10 @@ async def desconectar():
         await na_serial(fechar)
     except Exception as e:
         return resposta_erro(e)
-    registrar("info", "Desconectado.")
+    # desconectar à mão desliga a conexão automática, senão ela reconecta em 3 s
+    cfg = cenas.salvar_config({"auto_conectar": False})
+    registrar("info", "Desconectado. A conexão automática foi desligada; religue no cartão Cena e autonomia.")
+    publicar_status()
     return {"ok": True, **status_atual()}
 
 
@@ -304,12 +602,14 @@ async def desconectar():
 async def inicializar():
     """1B 40 + brilho 100 % + cursor apagado (driver.VFD.iniciar), e limpa a prévia."""
     parar_exposicao("a tela foi inicializada")
+    escrita.cancelar.set()
     try:
         await na_serial(com_tela, lambda t: t.iniciar())
     except Exception as e:
         return resposta_erro(e)
     estado.previa = bytes(len(estado.previa))
     estado.brilho = 8
+    estado.exibindo = "nada"
     publicar_previa()
     publicar_status()
     registrar("info", "Tela inicializada (1B 40): apagada, brilho 100 %.")
@@ -317,8 +617,8 @@ async def inicializar():
 
 
 class PedidoDesenho(BaseModel):
-    """Um desenho de tela inteira: texto digitado na hora ou padrão de teste de pontos."""
-    tipo: str = "texto"            # "texto" ou "teste"
+    """Um desenho de tela inteira: texto digitado na hora, logo ou padrão de teste de pontos."""
+    tipo: str = "texto"            # "texto", "logo" ou "teste"
     texto: str = ""
     peso: str = "medium"           # light | regular | medium | bold | black
     tamanho: int = 0               # 0 = automático (maior letra que cabe); senão, pontos
@@ -334,7 +634,6 @@ def _desenhar(pedido):
         descricao = f"Teste de pontos: {presets.PADROES[pedido.padrao]}."
         info = {}
     elif pedido.tipo == "logo":
-        from PIL import Image
         img = Image.open(PASTA / "assets" / "logo_vfd_256x128.png").convert("1")
         descricao = "Logo frado enviada."
         info = {}
@@ -369,13 +668,14 @@ def previa_desenho(pedido: PedidoDesenho):
 @app.post("/api/desenho/enviar")
 async def enviar_desenho(pedido: PedidoDesenho):
     parar_exposicao("houve um envio manual")
+    escrita.cancelar.set()
+    if escrita.volta:
+        escrita.volta.cancel()
     try:
         img, dados, descricao, info = _desenhar(pedido)
-        await na_serial(com_tela, lambda t: t.bitmap(img))
+        await na_serial(mostrar, img, "manual")
     except Exception as e:
         return resposta_erro(e)
-    estado.previa = dados
-    publicar_previa()
     registrar("info", descricao)
     return {"ok": True, **info}
 
@@ -388,80 +688,15 @@ class PedidoBrilho(BaseModel):
 @app.post("/api/brilho")
 async def ajustar_brilho(pedido: PedidoBrilho):
     """Brilho 1..8 (1F 58 11..18). Não interrompe a exposição."""
-    nivel = max(1, min(8, pedido.nivel))
     try:
-        await na_serial(com_tela, lambda t: t.brilho(nivel))
+        await na_serial(aplicar_brilho, pedido.nivel)
     except Exception as e:
         return resposta_erro(e)
-    estado.brilho = nivel
-    registrar("info", f"Brilho {nivel} de 8.")
-    publicar_status()
-    return {"ok": True, "brilho": nivel}
+    registrar("info", f"Brilho {estado.brilho} de 8.")
+    return {"ok": True, "brilho": estado.brilho}
 
 
 # --------------------------------------------------------------- exposição
-# Caminho do deslocamento: no máximo 2 pontos para cada lado. Cabe na margem de 3 pontos do texto.
-DESLOCAMENTOS = [(0, 0), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1),
-                 (2, 0), (0, 2), (-2, 0), (0, -2)]
-SEGUNDOS_DESLOCAR = 60
-
-
-class FraseExpo(BaseModel):
-    texto: str
-    peso: str = "medium"
-    tamanho: int = 0
-
-
-class PedidoExposicao(BaseModel):
-    frases: list[FraseExpo]
-    segundos: int = 120            # tempo de cada frase na tela
-    deslocar: bool = True
-    espelhar_h: bool = False
-    espelhar_v: bool = False
-
-
-def parar_exposicao(motivo=None):
-    """Para o rodízio, se estiver ligado, e espera a thread sair."""
-    if not expo.ativa:
-        return
-    expo.parar_ev.set()
-    if expo.thread and expo.thread is not threading.current_thread():
-        expo.thread.join(timeout=5)
-    if motivo:
-        registrar("info", f"Exposição parada: {motivo}.")
-
-
-def _laco_exposicao(pedido, imagens):
-    """Thread do rodízio. imagens = uma PIL Image por frase, já desenhada e espelhada."""
-    from PIL import Image
-    i, passo = 0, 0
-    troca_em = time.time() + pedido.segundos
-    try:
-        while not expo.parar_ev.is_set():
-            dx, dy = DESLOCAMENTOS[passo % len(DESLOCAMENTOS)] if pedido.deslocar else (0, 0)
-            quadro = Image.new("1", (driver.W, driver.H), 0)
-            quadro.paste(imagens[i], (dx, dy))
-            com_tela(lambda t: t.bitmap(quadro))
-            estado.previa = driver.VFD._codificar(quadro)
-            expo.frase = i + 1
-            publicar_previa()
-            publicar_status()
-            falta = max(0.5, troca_em - time.time())
-            espera = min(falta, SEGUNDOS_DESLOCAR) if pedido.deslocar else falta
-            if expo.parar_ev.wait(espera):
-                break
-            passo += 1
-            if time.time() >= troca_em:
-                i = (i + 1) % len(imagens)
-                troca_em = time.time() + pedido.segundos
-    except Exception as e:
-        registrar("erro", f"Exposição interrompida. {e}")
-    finally:
-        expo.ativa = False
-        expo.frase = 0
-        publicar_status()
-
-
 @app.post("/api/exposicao/iniciar")
 async def iniciar_exposicao(pedido: PedidoExposicao):
     try:
@@ -479,14 +714,10 @@ async def iniciar_exposicao(pedido: PedidoExposicao):
             imagens.append(presets.espelhar(img, pedido.espelhar_h, pedido.espelhar_v))
     except Exception as e:
         return resposta_erro(e)
-    parar_exposicao()
-    expo.parar_ev.clear()
-    expo.ativa, expo.frase, expo.total = True, 0, len(imagens)
-    expo.thread = threading.Thread(target=_laco_exposicao, args=(pedido, imagens),
-                                   daemon=True, name="exposicao")
-    expo.thread.start()
-    registrar("info", f"Exposição ligada: {len(imagens)} frase(s), {pedido.segundos} s cada"
-                      f"{', com deslocamento' if pedido.deslocar else ''}.")
+    escrita.cancelar.set()
+    if escrita.volta:
+        escrita.volta.cancel()
+    comecar_exposicao(pedido, imagens)
     return {"ok": True}
 
 
@@ -497,11 +728,128 @@ def rota_parar_exposicao():
     return {"ok": True}
 
 
+# ------------------------------------------------------------- cenas e config
+class PedidoCena(BaseModel):
+    nome: str
+    cena: dict
+
+
+@app.get("/api/cenas")
+def listar_cenas():
+    return {"cenas": cenas.todas(), "config": cenas.config()}
+
+
+@app.post("/api/cenas")
+def salvar_cena(pedido: PedidoCena):
+    try:
+        nome = cenas.salvar(pedido.nome, pedido.cena)
+    except Exception as e:
+        return JSONResponse({"ok": False, "erro": str(e)}, status_code=400)
+    registrar("info", f"Cena \"{nome}\" salva em cenas.json.")
+    return {"ok": True, "nome": nome, "cenas": cenas.todas()}
+
+
+@app.delete("/api/cenas/{nome}")
+def apagar_cena(nome: str):
+    try:
+        cenas.apagar(nome)
+    except Exception as e:
+        return JSONResponse({"ok": False, "erro": str(e)}, status_code=400)
+    registrar("info", f"Cena \"{nome}\" apagada.")
+    return {"ok": True, "cenas": cenas.todas()}
+
+
+@app.post("/api/config")
+def salvar_config(novo: dict):
+    cfg = cenas.salvar_config(novo)
+    registrar("info", "Configuração salva em config.json.")
+    publicar_status()
+    return {"ok": True, "config": cfg}
+
+
+@app.post("/api/cenas/{nome}/aplicar")
+async def aplicar_cena(nome: str):
+    """Vira a cena padrão, aplica o brilho e (se auto_exposicao) liga o rodízio dela."""
+    if nome not in cenas.todas():
+        return JSONResponse({"ok": False, "erro": f"Cena \"{nome}\" não existe."}, status_code=400)
+    cenas.salvar_config({"cena_padrao": nome})
+    _, cena = cenas.obter(nome)
+    if estado.conectado:
+        try:
+            await na_serial(aplicar_brilho, cena["brilho"])
+        except Exception as e:
+            return resposta_erro(e)
+        escrita.cancelar.set()
+        if escrita.volta:
+            escrita.volta.cancel()
+        voltar_ao_rodizio(f"cena \"{nome}\" aplicada")
+    registrar("info", f"Cena padrão agora é \"{nome}\".")
+    publicar_status()
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ API v1
+class PedidoTextoV1(BaseModel):
+    """O que o app do Marlus manda. Só 'texto' é obrigatório; o resto vem da cena."""
+    texto: str
+    cena: str | None = None
+    modo: str | None = None        # "palavra" ou "inteira"
+    segundos: int | None = None    # quanto tempo fica antes do rodízio voltar
+    peso: str | None = None
+    tamanho: int | None = None
+    origem: str = "api"            # nome do app que mandou, só para o log
+
+
+@app.post("/api/v1/texto")
+def api_v1_texto(pedido: PedidoTextoV1):
+    try:
+        return exibir_pela_api(pedido.texto, pedido.cena, pedido.modo, pedido.segundos, pedido.peso,
+                               pedido.tamanho, pedido.origem[:30])
+    except Exception as e:
+        return resposta_erro(e, 503 if str(e) == MSG_SEM_CONEXAO else 400)
+
+
+@app.get("/api/v1/estado")
+def api_v1_estado():
+    nome, cena = cena_atual()
+    return {"ok": True, "conectado": estado.conectado, "porta": estado.porta, "exibindo": estado.exibindo,
+            "cena_padrao": nome, "cenas": sorted(cenas.todas()), "ultima": estado.ultima_api,
+            "tela": {"largura": driver.W, "altura": driver.H}}
+
+
+@app.post("/api/v1/limpar")
+async def api_v1_limpar():
+    """Apaga a tela e para tudo (rodízio e frase em exibição)."""
+    parar_exposicao("API pediu para limpar")
+    escrita.cancelar.set()
+    if escrita.volta:
+        escrita.volta.cancel()
+    try:
+        await na_serial(mostrar, Image.new("1", (driver.W, driver.H), 0), "api")
+    except Exception as e:
+        return resposta_erro(e, 503)
+    return {"ok": True}
+
+
+@app.post("/api/v1/rodizio")
+def api_v1_rodizio():
+    """Volta ao rodízio da cena padrão agora."""
+    escrita.cancelar.set()
+    if escrita.volta:
+        escrita.volta.cancel()
+    try:
+        voltar_ao_rodizio("API pediu o rodízio")
+    except Exception as e:
+        return resposta_erro(e, 503)
+    return {"ok": True, "exposicao": expo.resumo()}
+
+
+# --------------------------------------------------------------- WebSocket
 @app.websocket("/ws")
 async def ws(websocket: WebSocket):
     origem = websocket.headers.get("origin", "")
     if websocket.headers.get("host", "") not in HOSTS_OK or \
-            origem not in {f"http://{h}" for h in HOSTS_OK}:
+            (origem and origem not in {f"http://{h}" for h in HOSTS_OK}):
         await websocket.close(code=1008)
         return
     await websocket.accept()
@@ -525,7 +873,9 @@ def main():
     import uvicorn
     url = f"http://{HOST}:{PORTA_HTTP}"
     print(f"VFD Studio em {url}  (Ctrl+C para sair)")
-    threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+    import os
+    if not os.environ.get("VFD_SEM_NAVEGADOR"):      # no início automático do Mac não há quem veja
+        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     uvicorn.run(app, host=HOST, port=PORTA_HTTP, log_level="warning")
 
 

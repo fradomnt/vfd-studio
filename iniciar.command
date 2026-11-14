@@ -5,7 +5,8 @@
 #   xattr -d com.apple.quarantine iniciar.command ; chmod +x iniciar.command
 cd "$(dirname "$0")" || exit 1
 
-pausar() { read -r -p "Enter para fechar..." _; }
+pausar() { [ "$1" = "--sem-pausa" ] || read -r -p "Enter para fechar..." _; }
+SEM_PAUSA="$1"
 
 # O /usr/bin/python3 do macOS é só um atalho que pede para instalar as Command Line Tools.
 # Preferimos o Python do python.org (instala em /Library/Frameworks) ou do Homebrew.
@@ -20,18 +21,18 @@ if [ -z "$PY" ]; then
   else
     echo "Python 3 não encontrado."
     echo "Baixe o instalador para macOS em https://www.python.org/downloads/ , instale e rode de novo."
-    pausar; exit 1
+    pausar "$SEM_PAUSA"; exit 1
   fi
 fi
 echo "Python: $PY ($("$PY" --version 2>&1))"
 
 if [ ! -x .venv/bin/python ]; then
   echo "Criando ambiente .venv (só na primeira vez)..."
-  "$PY" -m venv .venv || { echo "Não consegui criar o .venv."; pausar; exit 1; }
+  "$PY" -m venv .venv || { echo "Não consegui criar o .venv."; pausar "$SEM_PAUSA"; exit 1; }
 fi
 .venv/bin/python -m pip install -q --disable-pip-version-check -r requirements.txt \
-  || { echo "Falha ao instalar as dependências. Confira a internet e tente de novo."; pausar; exit 1; }
+  || { echo "Falha ao instalar as dependências. Confira a internet e tente de novo."; pausar "$SEM_PAUSA"; exit 1; }
 
 echo "Abrindo o VFD Studio... (feche esta janela para encerrar)"
 .venv/bin/python app.py
-pausar
+pausar "$SEM_PAUSA"

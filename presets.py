@@ -41,11 +41,6 @@ PRESETS = {
         "texto": "Devaneios\ndo Aparato",
         "peso": "bold",
     },
-    "sol": {
-        "nome": "O sol nasce pra todos",
-        "texto": "O sol nasce\npra todos",
-        "peso": "bold",
-    },
     "acentos": {
         "nome": "Teste de acentos e números",
         "texto": "ÁÉÍÓÚ áéíóú ÃÕ ãõ Çç\nABCDEFGHIJKLM abcdefghijklm\n0123456789 .,:;!?",
@@ -210,3 +205,76 @@ def espelhar(img, horizontal=False, vertical=False):
 def lista():
     return [{"id": k, "nome": v["nome"], "texto": v["texto"], "peso": v.get("peso", "medium")}
             for k, v in PRESETS.items()]
+
+
+# ================================================== escrita palavra a palavra e páginas
+def layout_texto(texto, peso="medium", tamanho=0):
+    """Decide linhas e tamanho UMA vez, para os quadros parciais não pularem.
+    Devolve dict com linhas (lista de listas de palavras), fonte, y0, altura_linha, tam, coube."""
+    texto = (texto or "").strip("\n")
+    if not texto.strip():
+        return None
+    coube = True
+    if tamanho:
+        tam = max(TAM_MIN, min(TAM_MAX, int(tamanho)))
+        linhas = quebrar_por_largura(texto, fonte(peso, tam))
+        coube = _cabe([l or " " for l in linhas], peso, tam)
+    else:
+        linhas, tam = arrumar_linhas(texto, peso)
+        if tam == 0:
+            raise ValueError("O texto não cabe na tela nem com a menor letra. Encurte o texto.")
+    f = fonte(peso, tam)
+    _, altura, altura_linha = _medir([l or " " for l in linhas], f)
+    return {"linhas": [l.split() for l in linhas], "fonte": f, "y0": (H - altura) // 2,
+            "altura_linha": altura_linha, "tam": tam, "coube": coube,
+            "palavras": sum(len(l.split()) for l in linhas)}
+
+
+def desenhar_layout(lay, palavras_visiveis=None):
+    """Desenha o layout mostrando só as primeiras N palavras (None = todas).
+    Cada linha fica ancorada onde ficaria centralizada completa: o texto 'aparece' sem se mexer."""
+    img = Image.new("1", (W, H), 0)
+    if lay is None:
+        return img
+    d = ImageDraw.Draw(img)
+    d.fontmode = "1"
+    f, y = lay["fonte"], lay["y0"]
+    restantes = lay["palavras"] if palavras_visiveis is None else max(0, palavras_visiveis)
+    for palavras in lay["linhas"]:
+        completa = " ".join(palavras)
+        x0 = (W - _REGUA.textlength(completa, font=f)) / 2
+        mostrar = palavras[:restantes]
+        restantes -= len(mostrar)
+        if mostrar:
+            d.text((x0, y), " ".join(mostrar), font=f, fill=1, anchor="la")
+        y += lay["altura_linha"] + ENTRELINHA
+    return img
+
+
+def paginar(texto, peso="medium", tamanho=0, tam_min=18):
+    """Texto longo vira páginas que cabem com letra >= tam_min. Quebras manuais = 1 página só."""
+    texto = (texto or "").strip()
+    if not texto:
+        return []
+    if "\n" in texto or tamanho:
+        return [texto]
+    if maior_tamanho(quebrar(texto, 1), peso) >= tam_min or len(texto.split()) <= 2:
+        # cabe inteiro (arrumar_linhas acha o melhor); testa rápido com a divisão automática
+        if arrumar_linhas(texto, peso)[1] >= tam_min:
+            return [texto]
+    palavras = texto.split()
+    paginas, i = [], 0
+    while i < len(palavras):
+        j = i + 1
+        melhor = j
+        # cresce a página enquanto couber com letra >= tam_min
+        while j <= len(palavras):
+            trecho = " ".join(palavras[i:j])
+            if arrumar_linhas(trecho, peso)[1] >= tam_min:
+                melhor = j
+                j += 1
+            else:
+                break
+        paginas.append(" ".join(palavras[i:melhor]))
+        i = melhor
+    return paginas

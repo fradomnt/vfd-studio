@@ -75,6 +75,7 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 15px/1.45
   background: var(--cartao); align-self: center; flex: none;
 }
 #conexao h2::before { background: var(--c-conexao); }
+#texto-cartao h2::before { background: #CFE3F7; }   /* azul pastel suave */
 #previa-cartao h2::before { background: var(--acento); }
 #teste-cartao h2::before { background: var(--c-teste); }
 #expo-cartao h2::before { background: var(--c-expo); }
@@ -153,3 +154,21 @@ button.ocupado { cursor: progress; opacity: .7; }
 .expo-lista button:hover:not(:disabled) { background: var(--alerta); color: #fff; }
 #expo-seg { width: 78px; padding: 7px 10px; font: 600 14px var(--f-mono); }
 #expo-info.ativa { color: var(--acento-escuro); font-weight: 700; }
+
+/* ------------------------------------------------------------- cena e autonomia */
+#cena-cartao h2::before { background: #FFD9B3; }   /* pêssego pastel */
+.duas { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+@media (max-width: 760px) { .duas { grid-template-columns: 1fr; } }
+.cartao h3 { margin: 14px 0 8px; font: 800 13px var(--f-titulo); text-transform: uppercase; letter-spacing: .06em; }
+.cartao h3:first-child { margin-top: 0; }
+input[type=text], input[type=number].num {
+  border: 2px solid var(--linha); border-radius: var(--raio-p); background: var(--cartao); color: var(--tinta);
+  padding: 8px 10px; font: 600 14px var(--f-texto);
+}
+input[type=text] { flex: 1; min-width: 120px; }
+input[type=number].num { width: 72px; font-family: var(--f-mono); }
+input[type=text]:focus, input[type=number]:focus { outline: 3px solid var(--acento); outline-offset: 1px; }
+.ao-vivo.bloco { margin: 0 0 10px; }
+#cena-cartao textarea { font-size: 14px; }
+code { font: 12px var(--f-mono); background: var(--c-log); padding: 1px 5px; border-radius: 4px; }
+#exibindo { color: var(--acento-escuro); }

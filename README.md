@@ -15,6 +15,10 @@ Feita para a escultura *Devaneios do Aparato*: a tela fica dentro da peça, atr�
   para a tela (que já tem desgaste) marcar menos.
 - **Logo:** botão que manda a assinatura frado para a tela.
 - **Teste de pontos:** todos acesos, xadrez, xadrez invertido, todos apagados.
+- **Cenas** salvas em `cenas.json`: letra, tamanho, espelhar, brilho, rodízio e modo das frases da API.
+- **Autonomia:** ao ligar, acha o conversor sozinho, mostra boas-vindas na tela, liga o rodízio da cena
+  padrão e reconecta se o USB sair. Frases que chegam pela API interrompem o rodízio; depois ele volta.
+- **API local** para outro programa escrever na tela: [docs/API.md](docs/API.md).
 - Log dos envios ao vivo.
 
 Pesquisa, decisões e próximos passos estão em [docs/PESQUISA.md](docs/PESQUISA.md).
@@ -45,6 +49,13 @@ Ligação elétrica e protocolo estão em [docs/ICD_tela_VFD.md](docs/ICD_tela_V
      Isso acontece quando a pasta veio num ZIP baixado. Pelo `git clone` não acontece.
    - Se nada acontecer ao clicar, no Terminal: `chmod +x iniciar.command` e tente de novo.
 4. Abre uma janela do Terminal (o servidor) e o navegador abre a página. **Não feche o Terminal.**
+
+### Abrir sozinho ao ligar o Mac (museu)
+
+Duplo clique em `mac/instalar_inicio_automatico.command`. Ele registra o VFD Studio para abrir no login
+e reabrir se fechar. Depois, uma vez só, ligue o **login automático** em Ajustes do Sistema › Usuários
+e Grupos, senão após uma queda de luz o Mac para na tela de senha. Para desfazer:
+`mac/remover_inicio_automatico.command`.
 
 ### Pela linha de comando (qualquer sistema)
 
@@ -86,7 +97,9 @@ presets.py          texto desenhado como imagem (Roboto Condensed), frases pront
 static/             index.html, app.js, style.css — a página, sem framework
 assets/fonts/       Roboto Condensed (licença SIL OFL)
 assets/logo_vfd.bin logo já no formato da tela (copiar do Mac mini; ainda não está no repositório)
-docs/               PESQUISA.md, ICD_tela_VFD.md, simulação da frase
+cenas.py            cenas e configuração em arquivo (cenas.json, config.json)
+docs/               PESQUISA.md, ICD_tela_VFD.md, API.md, simulação da frase
+mac/                instalar/remover início automático (LaunchAgent)
 iniciar.bat / iniciar.command   lançadores Windows / macOS
 vfd_monitor.py, vfd_claude.py   scripts originais de bancada; o app ainda não os usa (etapas E4/E5)
 ```

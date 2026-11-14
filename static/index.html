@@ -108,6 +108,52 @@
       </div>
     </section>
 
+    <!-- Cena e autonomia -->
+    <section class="cartao largo" id="cena-cartao">
+      <h2>Cena e autonomia <small id="cena-info">o que a tela faz sozinha no museu</small></h2>
+      <div class="duas">
+        <div>
+          <h3>Cena</h3>
+          <p class="dica">Uma cena guarda letra, tamanho, espelhar, brilho, rodízio e como as frases da API aparecem. Fica em <code>cenas.json</code>.</p>
+          <div class="linha">
+            <select id="cena-sel" aria-label="Cenas salvas"></select>
+            <button id="cena-aplicar" class="secundario" title="Vira a cena padrão: aplica o brilho e liga o rodízio dela">Aplicar</button>
+            <button id="cena-apagar" class="secundario">Apagar</button>
+          </div>
+          <div class="linha">
+            <input type="text" id="cena-nome" placeholder="nome da cena" maxlength="40" aria-label="Nome da cena">
+            <button id="cena-salvar" title="Guarda os ajustes atuais da página (letra, tamanho, espelhar, brilho, rodízio) com esse nome">Salvar cena</button>
+          </div>
+          <h3>Frases da API</h3>
+          <div class="linha">
+            <label class="ao-vivo">Modo
+              <select id="api-modo" aria-label="Modo de escrita">
+                <option value="palavra">palavra por palavra</option>
+                <option value="inteira">frase inteira</option>
+              </select>
+            </label>
+            <label class="ao-vivo"><input type="number" id="api-ppq" min="1" max="5" value="1" class="num"> palavra(s) por quadro</label>
+          </div>
+          <div class="linha">
+            <label class="ao-vivo">Fica <input type="number" id="api-seg" min="3" max="3600" value="90" class="num"> s e volta ao rodízio</label>
+          </div>
+          <p class="dica">Endereço para o outro app: <code>POST http://127.0.0.1:8765/api/v1/texto</code> com <code>{"texto": "..."}</code>. Detalhes em <code>docs/API.md</code>.</p>
+        </div>
+        <div>
+          <h3>Automático</h3>
+          <label class="ao-vivo bloco"><input type="checkbox" id="auto-conectar"> Conectar sozinho ao ligar e sempre que o USB voltar</label>
+          <label class="ao-vivo bloco"><input type="checkbox" id="auto-expo"> Ligar o rodízio da cena padrão depois de conectar</label>
+          <label class="ao-vivo bloco"><input type="checkbox" id="auto-bv"> Mostrar boas-vindas na tela ao conectar</label>
+          <textarea id="bv-texto" rows="3" maxlength="200" aria-label="Texto das boas-vindas"></textarea>
+          <div class="linha">
+            <label class="ao-vivo">Boas-vindas por <input type="number" id="bv-seg" min="1" max="600" value="8" class="num"> s</label>
+            <button id="auto-salvar">Salvar automático</button>
+          </div>
+          <p class="dica"><code>{hora}</code> vira a hora atual. Agora na tela: <strong id="exibindo">nada</strong>. <span id="ultima-api"></span></p>
+        </div>
+      </div>
+    </section>
+
     <!-- 8. Log -->
     <section class="cartao largo" id="log-cartao">
       <h2>Log <small id="log-conta">0 / 200</small></h2>

@@ -18,6 +18,11 @@ const el = {
   expoLista: $("expo-lista"), expoVazia: $("expo-vazia"), expoAdd: $("expo-add"),
   expoSeg: $("expo-seg"), expoDesloc: $("expo-desloc"),
   expoIniciar: $("expo-iniciar"), expoParar: $("expo-parar"),
+  cenaSel: $("cena-sel"), cenaNome: $("cena-nome"), cenaSalvar: $("cena-salvar"), cenaAplicar: $("cena-aplicar"),
+  cenaApagar: $("cena-apagar"), apiModo: $("api-modo"), apiPpq: $("api-ppq"), apiSeg: $("api-seg"),
+  autoConectar: $("auto-conectar"), autoExpo: $("auto-expo"), autoBv: $("auto-bv"), bvTexto: $("bv-texto"),
+  bvSeg: $("bv-seg"), autoSalvar: $("auto-salvar"), exibindo: $("exibindo"), ultimaApi: $("ultima-api"),
+  cenaInfo: $("cena-info"),
   testes: [...document.querySelectorAll("button.teste")],
 };
 const MSG_SERVIDOR_PARADO =
@@ -90,6 +95,12 @@ function aplicarStatus(s) {
   if (conectado && s.porta) el.porta.value = s.porta;
   if (s.brilho) { el.brilho.value = s.brilho; el.brilhoValor.textContent = `${s.brilho} de 8`; }
   if (s.exposicao) expo = s.exposicao;
+  if (s.config) mostrarConfig(s.config);
+  if (s.exibindo) {
+    const nomes = { nada: "nada", "boas-vindas": "boas-vindas", rodizio: "rodízio", api: "frase da API", manual: "envio manual" };
+    el.exibindo.textContent = nomes[s.exibindo] || s.exibindo;
+  }
+  if (s.ultima_api) el.ultimaApi.textContent = `Última da API às ${s.ultima_api.hora}: “${s.ultima_api.texto}”`;
   mostrarExpo();
   atualizarBotoes();
 }
@@ -220,6 +231,89 @@ function iniciarExpo() {
   });
 }
 
+// ---------------------------------------------------------------- cenas
+let cenasVistas = {};
+let configVista = {};
+
+function mostrarConfig(cfg) {
+  configVista = cfg;
+  el.autoConectar.checked = !!cfg.auto_conectar;
+  el.autoExpo.checked = !!cfg.auto_exposicao;
+  el.autoBv.checked = !!cfg.boas_vindas;
+  if (document.activeElement !== el.bvTexto) el.bvTexto.value = cfg.boas_vindas_texto || "";
+  el.bvSeg.value = cfg.boas_vindas_segundos || 8;
+  el.cenaInfo.textContent = `cena padrão: ${cfg.cena_padrao}`;
+}
+
+async function carregarCenas(selecionar) {
+  const { cenas, config } = await api("/api/cenas");
+  cenasVistas = cenas;
+  mostrarConfig(config);
+  el.cenaSel.innerHTML = "";
+  for (const nome of Object.keys(cenas).sort()) {
+    el.cenaSel.add(new Option(nome === config.cena_padrao ? `${nome} (padrão)` : nome, nome));
+  }
+  el.cenaSel.value = selecionar || config.cena_padrao || el.cenaSel.value;
+  el.cenaNome.value = el.cenaSel.value;
+  const c = cenas[el.cenaSel.value];
+  if (c) { el.apiModo.value = c.api_modo; el.apiPpq.value = c.api_palavras_por_quadro; el.apiSeg.value = c.api_segundos; }
+}
+
+// A cena é montada a partir do que está na página agora.
+function montarCena() {
+  const p = pedidoTexto();
+  return {
+    peso: p.peso, tamanho: p.tamanho, espelhar_h: p.espelhar_h, espelhar_v: p.espelhar_v,
+    brilho: Number(el.brilho.value), segundos: Number(el.expoSeg.value) || 120, deslocar: el.expoDesloc.checked,
+    rodizio: rodizio, api_modo: el.apiModo.value, api_palavras_por_quadro: Number(el.apiPpq.value) || 1,
+    api_segundos: Number(el.apiSeg.value) || 90,
+  };
+}
+
+// Carrega uma cena nos controles da página (sem mandar nada para a tela).
+function cenaParaPagina(c) {
+  el.peso.value = c.peso;
+  el.tamAuto.checked = !c.tamanho; el.tam.disabled = el.tamAuto.checked;
+  if (c.tamanho) el.tam.value = c.tamanho;
+  el.espH.checked = c.espelhar_h; el.espV.checked = c.espelhar_v;
+  el.brilho.value = c.brilho; el.brilhoValor.textContent = `${c.brilho} de 8`;
+  el.expoSeg.value = c.segundos; el.expoDesloc.checked = c.deslocar;
+  el.apiModo.value = c.api_modo; el.apiPpq.value = c.api_palavras_por_quadro; el.apiSeg.value = c.api_segundos;
+  rodizio = c.rodizio.map((f) => ({ ...f }));
+  salvarRodizio(); mostrarExpo(); textoMudou();
+}
+
+async function salvarCena() {
+  const nome = el.cenaNome.value.trim();
+  if (!nome) throw new Error("Dê um nome à cena.");
+  const r = await api("/api/cenas", { nome, cena: montarCena() });
+  await carregarCenas(r.nome);
+}
+
+async function aplicarCena() {
+  const nome = el.cenaSel.value;
+  if (!nome) return;
+  cenaParaPagina(cenasVistas[nome]);
+  await api(`/api/cenas/${encodeURIComponent(nome)}/aplicar`, {});
+  await carregarCenas(nome);
+}
+
+async function apagarCena() {
+  const nome = el.cenaSel.value;
+  if (!nome || !confirm(`Apagar a cena “${nome}”?`)) return;
+  const r = await fetch(`/api/cenas/${encodeURIComponent(nome)}`, { method: "DELETE" });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.erro);
+  await carregarCenas();
+}
+
+function salvarAutomatico() {
+  return api("/api/config", {
+    auto_conectar: el.autoConectar.checked, auto_exposicao: el.autoExpo.checked, boas_vindas: el.autoBv.checked,
+    boas_vindas_texto: el.bvTexto.value, boas_vindas_segundos: Number(el.bvSeg.value) || 8,
+  });
+}
+
 // ------------------------------------------------------------ teste de pontos
 async function enviarTeste(botao) {
   await api("/api/desenho/enviar", { tipo: "teste", padrao: botao.dataset.padrao });
@@ -332,6 +426,17 @@ el.brilho.addEventListener("change", () => acao(el.brilho, () => api("/api/brilh
 el.expoAdd.addEventListener("click", () => acao(el.expoAdd, async () => adicionarAoRodizio()));
 el.expoIniciar.addEventListener("click", () => acao(el.expoIniciar, iniciarExpo));
 el.expoParar.addEventListener("click", () => acao(el.expoParar, () => api("/api/exposicao/parar", {})));
+el.cenaSel.addEventListener("change", () => {
+  el.cenaNome.value = el.cenaSel.value;
+  const c = cenasVistas[el.cenaSel.value];
+  if (c) cenaParaPagina(c);
+});
+el.cenaSalvar.addEventListener("click", () => acao(el.cenaSalvar, salvarCena));
+el.cenaAplicar.addEventListener("click", () => acao(el.cenaAplicar, aplicarCena));
+el.cenaApagar.addEventListener("click", () => acao(el.cenaApagar, apagarCena));
+el.autoSalvar.addEventListener("click", () => acao(el.autoSalvar, salvarAutomatico));
+carregarCenas().then(() => { const c = cenasVistas[el.cenaSel.value]; if (c) cenaParaPagina(c); })
+  .catch((e) => mostrarErro(e.message));
 mostrarExpo();
 
 carregarPortas().catch((e) => mostrarErro(e.message));

@@ -1,0 +1,21 @@
+{
+  "museu": {
+    "peso": "medium",
+    "tamanho": 0,
+    "espelhar_h": false,
+    "espelhar_v": false,
+    "brilho": 6,
+    "segundos": 120,
+    "deslocar": true,
+    "rodizio": [
+      {
+        "texto": "Devaneios do Aparato:\nA realidade é apenas\numa sombra da verdade.",
+        "peso": "medium",
+        "tamanho": 0
+      }
+    ],
+    "api_modo": "palavra",
+    "api_palavras_por_quadro": 1,
+    "api_segundos": 90
+  }
+}
