@@ -283,7 +283,7 @@ function montarCena() {
     rodizio: rodizio, api_modo: el.apiModo.value, api_palavras_por_quadro: Number(el.apiPpq.value) || 1,
     api_segundos: Number(el.apiSeg.value) || 90,
     dialogo_modo: el.dlgModo.value, dialogo_cps: Number(el.dlgCps.value) || 22,
-    dialogo_peso: el.dlgPeso.value, dialogo_tamanho: Number(el.dlgTam.value) || 14,
+    dialogo_peso: el.dlgPeso.value, dialogo_tamanho: Number(el.dlgTam.value) || 18,
     destaque_peso: el.dstPeso.value, destaque_tamanho: Number(el.dstTam.value) || 0,
     destaque_pausa: Number(el.dstPausa.value) || 0,
     dialogo_segundos: Number(el.dlgSeg.value) || 180,

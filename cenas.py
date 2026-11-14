@@ -35,7 +35,7 @@ CENA_PADRAO = {
     "dialogo_modo": "palavra",     # "caractere" | "palavra" | "linha": o que aparece de uma vez
     "dialogo_cps": 22,             # teto de caracteres por segundo; a serial decide o resto
     "dialogo_peso": "regular",
-    "dialogo_tamanho": 14,         # pontos, fixo: o fluxo não muda de letra a cada fala
+    "dialogo_tamanho": 18,         # pontos, fixo: o fluxo não muda de letra a cada fala
     "destaque_peso": "bold",
     "destaque_tamanho": 0,         # 0 = a maior letra que couber; o destaque tem a tela só para ele
     "destaque_pausa": 3,           # segundos com a fala parada antes de a tela limpar para o destaque
