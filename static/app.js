@@ -96,6 +96,7 @@ function aplicarStatus(s) {
   if (s.brilho) { el.brilho.value = s.brilho; el.brilhoValor.textContent = `${s.brilho} de 8`; }
   if (s.exposicao) expo = s.exposicao;
   if (s.config) mostrarConfig(s.config);
+  if (s.versao) $("versao").textContent = s.versao;
   if (s.exibindo) {
     const nomes = { nada: "nada", "boas-vindas": "boas-vindas", rodizio: "rodízio", api: "frase da API", manual: "envio manual", teste: "teste de pontos" };
     el.exibindo.textContent = nomes[s.exibindo] || s.exibindo;

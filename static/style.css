@@ -40,6 +40,7 @@ body { margin: 0; background: var(--fundo); color: var(--tinta); font: 15px/1.45
 }
 .topo .logo { height: 44px; width: auto; display: block; }
 .topo h1 { margin: 0; font: 800 22px/1 var(--f-titulo); letter-spacing: -.03em; }
+.versao { font: 700 12px var(--f-mono); color: var(--tinta-fraca); margin-left: 6px; vertical-align: middle; }
 .modelo { font: 12px var(--f-mono); color: var(--tinta-fraca); }
 .status {
   margin-left: auto; padding: 6px 14px; border-radius: 999px; border: 2px solid var(--linha);

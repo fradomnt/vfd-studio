@@ -8,13 +8,14 @@ inteira — que é o que importa atrás da lente Fresnel da escultura.
 Fonte embutida: Roboto Condensed (licença SIL Open Font License), em assets/fonts/.
 """
 import functools
-from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from vfd import W, H
 
-PASTA_FONTES = Path(__file__).resolve().parent / "assets" / "fonts"
+from caminhos import FIXOS
+
+PASTA_FONTES = FIXOS / "assets" / "fonts"
 PESOS = {"light": "Roboto_Condensed-Light.ttf",
          "regular": "Roboto_Condensed-Regular.ttf",
          "medium": "Roboto_Condensed-Medium.ttf",

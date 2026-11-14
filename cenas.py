@@ -9,9 +9,8 @@ Os arquivos ficam na pasta do app, para valer em qualquer navegador e sobreviver
 """
 import json
 import threading
-from pathlib import Path
 
-PASTA = Path(__file__).resolve().parent
+from caminhos import DADOS as PASTA
 ARQ_CENAS = PASTA / "cenas.json"
 ARQ_CONFIG = PASTA / "config.json"
 _lock = threading.Lock()

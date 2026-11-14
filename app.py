@@ -33,9 +33,10 @@ from pydantic import BaseModel
 import cenas
 import presets
 import vfd as driver
+from caminhos import DADOS, EMPACOTADO, FIXOS, VERSAO
 
 HOST, PORTA_HTTP = "127.0.0.1", 8765
-PASTA = Path(__file__).resolve().parent
+PASTA = FIXOS                 # static/ e assets/
 HOSTS_OK = {f"127.0.0.1:{PORTA_HTTP}", f"localhost:{PORTA_HTTP}"}
 TIMEOUT_ENVIO = 10.0          # segundos; uma tela inteira leva ~1,1 s
 
@@ -130,7 +131,7 @@ def registrar(nivel, texto):
 
 
 def status_atual():
-    return {"conectado": estado.conectado, "porta": estado.porta, "brilho": estado.brilho,
+    return {"versao": VERSAO, "conectado": estado.conectado, "porta": estado.porta, "brilho": estado.brilho,
             "exposicao": expo.resumo(), "exibindo": estado.exibindo, "ultima_api": estado.ultima_api,
             "config": cenas.config()}
 
@@ -948,7 +949,8 @@ def main():
     if hasattr(signal, "SIGHUP"):
         signal.signal(signal.SIGHUP, lambda *_: (apagar_ao_sair(), os._exit(0)))
     url = f"http://{HOST}:{PORTA_HTTP}"
-    print(f"VFD Studio em {url}  (Ctrl+C para sair)")
+    print(f"VFD Studio {VERSAO} em {url}  (Ctrl+C para sair)" + ("  [empacotado]" if EMPACOTADO else ""))
+    print(f"  cenas e configuração em: {DADOS}")
     if not os.environ.get("VFD_SEM_NAVEGADOR"):      # no início automático do Mac não há quem veja
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     uvicorn.run(app, host=HOST, port=PORTA_HTTP, log_level="warning")

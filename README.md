@@ -137,17 +137,29 @@ Envio de imagem com pontilhado e logo (E3), painel ao vivo e relógio (E4), chat
 opcional e pago à parte), testes automáticos (E6), e o rodízio de pixels guiado por mapa de desgaste
 (ver docs/PESQUISA.md, seção 6).
 
-## Executável opcional (não gerado)
+## Executável pronto (sem instalar Python)
 
-Quando tudo estiver estável, dá para empacotar com PyInstaller, em cada sistema separadamente:
+Para o museu e para quem não quer mexer com Python, há o app empacotado, com a logo frado no ícone:
 
-```bash
-pip install pyinstaller
-pyinstaller --onefile --add-data "static:static" --add-data "assets:assets" app.py
-```
+- **Windows:** baixe `VFD-Studio-2.0-windows.zip` na página de
+  [Releases](https://github.com/fradomnt/vfd-studio/releases), descompacte e dê duplo clique em
+  **VFD Studio.exe**. O Windows SmartScreen pode avisar na primeira vez ("Mais informações › Executar
+  assim mesmo"), porque o executável não tem assinatura digital.
+- **macOS:** `VFD-Studio-2.0-mac.zip` nas Releases, descompacte, botão direito no **VFD Studio.app › Abrir**
+  (só na primeira vez; o app não é assinado pela Apple). Se o Finder recusar: no Terminal,
+  `xattr -cr "VFD Studio.app"`.
 
-No Windows use `;` em vez de `:` nos `--add-data`. Antivírus às vezes bloqueiam executáveis assim;
-os lançadores `.bat`/`.command` continuam sendo o caminho mais simples.
+`cenas.json` e `config.json` ficam **ao lado** do executável (ou do .app): é lá que o app grava as cenas.
+
+### Gerar você mesmo
+
+Cada sistema gera o seu, não dá para gerar o do Mac no Windows nem o contrário:
+
+- Windows: duplo clique em `windows/gerar_exe.bat` → `dist\VFD Studio\VFD Studio.exe` e o zip.
+- macOS: duplo clique em `mac/gerar_app.command` → `dist/VFD Studio.app` e o zip.
+
+Os dois usam `vfd_studio.spec` (PyInstaller, listado em `requirements-dev.txt`). Para publicar nas
+Releases: `gh release upload v2.0 dist/VFD-Studio-2.0-mac.zip`.
 
 ## Hardware (fixo)
 

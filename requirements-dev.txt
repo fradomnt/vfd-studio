@@ -1,0 +1,2 @@
+# só para gerar o executável (windows/gerar_exe.bat, mac/gerar_app.command)
+pyinstaller>=6.6
