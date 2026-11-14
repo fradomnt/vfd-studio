@@ -165,9 +165,7 @@ Releases: `gh release upload v2.0 dist/VFD-Studio-2.0-mac.zip`.
 
 ## Créditos
 
-- **Desenvolvimento criativo:** Frado Monteiro — [frado.com.br](https://frado.com.br)
-- **Integração com o app que manda as frases:** Marlus Araujo
-- Fonte Roboto Condensed (SIL Open Font License). Tela Noritake Itron GU256X128C-3900.
+**Desenvolvimento criativo:** Frado Monteiro — [frado.com.br](https://frado.com.br)
 
 ## Hardware (fixo)
 
