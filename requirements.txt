@@ -1,0 +1,9 @@
+fastapi>=0.110
+uvicorn>=0.29
+websockets>=12.0        # backend de WebSocket do uvicorn (sem ele o /ws não abre)
+pyserial>=3.5
+pillow>=10.0
+psutil>=5.9
+python-multipart>=0.0.9
+# opcional, só para o chat com o Claude (etapa E5):
+anthropic>=0.40

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VFD Studio</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topo">
+    <h1>VFD Studio</h1>
+    <span class="modelo">Noritake GU256X128C-3900 · 256×128 · 38400 8N1</span>
+    <span id="status" class="status desligado">desconectado</span>
+  </header>
+
+  <main class="grade">
+    <!-- 1. Conexão -->
+    <section class="cartao" id="conexao">
+      <h2>Conexão</h2>
+      <div class="linha">
+        <select id="porta" aria-label="Porta serial"></select>
+        <button id="atualizar" class="secundario" title="Procura as portas de novo (use depois de plugar o USB)">Atualizar</button>
+      </div>
+      <p id="porta-info" class="dica"></p>
+      <div class="linha">
+        <button id="conectar" title="Abre a porta. Não manda nada para a tela.">Conectar</button>
+        <button id="desconectar" class="secundario" disabled title="Libera a porta para outros programas">Desconectar</button>
+        <button id="iniciar" class="secundario" disabled title="Apaga a tela e volta o brilho para 100 %">Inicializar tela</button>
+      </div>
+      <p class="dica">Inicializar apaga o que estiver na tela.</p>
+      <p id="erro" class="erro" role="alert" hidden></p>
+    </section>
+
+    <!-- 2. Prévia -->
+    <section class="cartao" id="previa-cartao">
+      <h2>Prévia <small id="previa-estado">o último envio, ponto a ponto</small></h2>
+      <div class="moldura">
+        <canvas id="previa" width="768" height="384" aria-label="Prévia da tela 256 por 128"></canvas>
+      </div>
+      <p id="previa-dica" class="dica abaixo">Tela em branco. Envie um texto ou uma imagem para ver aqui.</p>
+    </section>
+
+    <!-- Texto desenhado na hora (vai para a tela como imagem) -->
+    <section class="cartao" id="texto-cartao">
+      <h2>Texto <small id="texto-info">digite e veja na prévia</small></h2>
+      <textarea id="texto" rows="4" maxlength="600" spellcheck="false"
+                placeholder="Digite aqui. Enter quebra a linha; sem Enter, eu divido as linhas para a letra ficar o maior possível."></textarea>
+      <div class="linha">
+        <select id="preset" aria-label="Frases prontas"></select>
+        <select id="peso" aria-label="Peso da letra">
+          <option value="light">Letra bem fina</option>
+          <option value="regular">Letra fina</option>
+          <option value="medium" selected>Letra média</option>
+          <option value="bold">Letra grossa</option>
+          <option value="black">Letra bem grossa</option>
+        </select>
+      </div>
+      <div class="linha tamanho">
+        <label class="ao-vivo"><input type="checkbox" id="tam-auto" checked> Tamanho automático</label>
+        <input type="range" id="tam" min="8" max="120" value="25" disabled aria-label="Tamanho da letra">
+        <output id="tam-valor">maior que couber</output>
+      </div>
+      <div class="linha opcoes">
+        <label title="Use se a lente inverter a imagem na escultura"><input type="checkbox" id="esp-h"> Espelhar na horizontal</label>
+        <label title="Use se a lente virar a imagem de cabeça para baixo"><input type="checkbox" id="esp-v"> Espelhar na vertical</label>
+      </div>
+      <div class="linha">
+        <button id="texto-enviar" disabled>Enviar para a tela</button>
+        <label class="ao-vivo" title="Manda para a tela sozinho, cerca de 1 s depois de você parar de digitar"><input type="checkbox" id="ao-vivo"> Enviar enquanto digito</label>
+      </div>
+      <p class="dica">Vai como imagem: os acentos aparecem e a letra ocupa a tela toda. Cada envio leva cerca de 1 s.</p>
+    </section>
+
+    <!-- Teste de pontos -->
+    <section class="cartao" id="teste-cartao">
+      <h2>Teste de pontos <small>para achar pontos fracos</small></h2>
+      <div class="linha">
+        <button class="teste secundario" data-padrao="cheio" disabled>Acender todos</button>
+        <button class="teste secundario" data-padrao="xadrez" disabled>Xadrez</button>
+        <button class="teste secundario" data-padrao="xadrez_inv" disabled>Xadrez invertido</button>
+        <button class="teste secundario" data-padrao="apagado" disabled>Apagar todos</button>
+      </div>
+      <p class="dica">Com todos acesos, os pontos gastos aparecem mais escuros. Os dois xadrezes juntos passam por todos os pontos com metade da carga. Não deixe tudo aceso por muito tempo.</p>
+    </section>
+
+    <!-- Exposição: brilho + rodízio com deslocamento -->
+    <section class="cartao largo" id="expo-cartao">
+      <h2>Exposição <small id="expo-info">parada</small></h2>
+      <div class="linha tamanho">
+        <label for="brilho">Brilho</label>
+        <input type="range" id="brilho" min="1" max="8" value="8" disabled>
+        <output id="brilho-valor">8 de 8</output>
+      </div>
+      <p class="dica">Brilho menor gasta menos a tela. Use o mais baixo que ainda dê para ler com a lente.</p>
+      <ol id="expo-lista" class="expo-lista"></ol>
+      <p id="expo-vazia" class="dica">Rodízio vazio. Escreva um texto acima e clique em "Adicionar o texto atual".</p>
+      <div class="linha">
+        <button id="expo-add" class="secundario">Adicionar o texto atual</button>
+        <label class="ao-vivo">Trocar a cada <input type="number" id="expo-seg" min="5" max="3600" value="120"> s</label>
+        <label class="ao-vivo" title="Move o texto 1 ou 2 pontos a cada minuto, para a frase não marcar a tela"><input type="checkbox" id="expo-desloc" checked> Deslocar um pouco a cada minuto</label>
+      </div>
+      <div class="linha">
+        <button id="expo-iniciar" disabled>Iniciar exposição</button>
+        <button id="expo-parar" class="secundario" disabled>Parar</button>
+      </div>
+    </section>
+
+    <!-- 8. Log -->
+    <section class="cartao largo" id="log-cartao">
+      <h2>Log <small id="log-conta">0 / 200</small></h2>
+      <ol id="log" class="log"></ol>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
