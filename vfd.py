@@ -126,12 +126,16 @@ class VFD:
 
     # --- envio bruto
     def raw(self, dados, pausa=0.0):
-        """Envia bytes e espera saírem pela serial. Blocos de 128 B respeitam o buffer de 256 B."""
+        """Envia bytes em blocos de 128 B (buffer da tela = 256 B).
+        No macOS o flush() do FTDI pode voltar antes dos bytes saírem (logo saiu cortado com 20 ms);
+        por isso a pausa é o tempo real do bloco (10 bits/byte) + folga (VFD_FOLGA_MS, padrão 30)."""
         t0 = time.time()
+        folga = float(os.environ.get("VFD_FOLGA_MS", "30")) / 1000
         for i in range(0, len(dados), 128):
-            self.ser.write(dados[i:i+128])
+            bloco = dados[i:i+128]
+            self.ser.write(bloco)
             self.ser.flush()
-            if len(dados) > 128: time.sleep(0.02)
+            if len(dados) > 128: time.sleep(len(bloco) * 10 / self.ser.baudrate + folga)
         if pausa: time.sleep(pausa)
         if self.ao_enviar:
             self.ao_enviar(len(dados), time.time() - t0)

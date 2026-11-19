@@ -145,8 +145,16 @@ Para quem não quer mexer com Python, há o app empacotado, com a logo frado no 
   [Releases](https://github.com/fradomnt/vfd-studio/releases), descompacte e dê duplo clique em
   **VFD Studio.exe**. O Windows SmartScreen pode avisar na primeira vez ("Mais informações › Executar
   assim mesmo"), porque o executável não tem assinatura digital.
-- **macOS:** `VFD-Studio-2.0-mac.zip` nas Releases, descompacte, botão direito no **VFD Studio.app › Abrir**
-  (só na primeira vez; o app não é assinado pela Apple). Se o Finder recusar: no Terminal,
+- **macOS (instalador, recomendado):** baixe `VFD-Studio-2.0-mac.pkg` nas Releases e dê duplo clique
+  › Continuar › Instalar. Ele coloca o app em **Aplicativos › VFD Studio**, mantém as cenas de uma
+  instalação anterior e abre o app no fim. Para atualizar, é só rodar um `.pkg` mais novo por cima.
+  - Na primeira vez o Mac pode bloquear (o instalador não é assinado pela Apple). macOS 15 ou mais novo:
+    **Ajustes do Sistema › Privacidade e Segurança › Abrir Mesmo Assim**. macOS 14 ou anterior: botão
+    direito no `.pkg` › **Abrir**.
+  - Requisitos: Mac com chip Apple (M1 ou mais novo) e macOS 12 ou mais novo. Num Mac Intel, gere o
+    instalador nele mesmo (abaixo).
+- **macOS (zip):** `VFD-Studio-2.0-mac.zip` nas Releases, descompacte, botão direito no
+  **VFD Studio.app › Abrir** (só na primeira vez). Se o Finder recusar: no Terminal,
   `xattr -cr "VFD Studio.app"`.
 
 `cenas.json` e `config.json` ficam **ao lado** do executável (ou do .app): é lá que o app grava as cenas.
@@ -157,9 +165,11 @@ Cada sistema gera o seu, não dá para gerar o do Mac no Windows nem o contrári
 
 - Windows: duplo clique em `windows/gerar_exe.bat` → `dist\VFD Studio\VFD Studio.exe` e o zip.
 - macOS: duplo clique em `mac/gerar_app.command` → `dist/VFD Studio.app` e o zip.
+- macOS, instalador: duplo clique em `mac/gerar_instalador.command` → gera o app e
+  `dist/VFD-Studio-2.0-mac.pkg`.
 
 Os dois usam `vfd_studio.spec` (PyInstaller, listado em `requirements-dev.txt`). Para publicar nas
-Releases: `gh release upload v2.0 dist/VFD-Studio-2.0-mac.zip`.
+Releases: `gh release upload v2.0 dist/VFD-Studio-2.0-mac.pkg dist/VFD-Studio-2.0-mac.zip --clobber`.
 
 ## Créditos
 
